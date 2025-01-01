@@ -1,20 +1,23 @@
 -- SETTINGS --
 local AI_ACTIVE = true -- Flag to turn AI on and off
-local CLOSE_RANGE_ONLY = true;
+local CLOSE_RANGE_ONLY = true
 
 _G.MESSAGE_SETTINGS = {
     ["MINIMUM_CHARACTERS"] = 1,
     ["MAXIMUM_CHARACTERS"] = 200,
     ["MAXIMUM_STUDS"] = 11,
-};
+}
 
 _G.WHITELISTED = { -- Only works if CLOSE_RANGE_ONLY is disabled
     ["seem2006"] = true,
-};
+}
 
 _G.BLACKLISTED = { -- Only works if CLOSE_RANGE_ONLY is enabled
     ["Builderman"] = true,
-};
+}
+
+_G.AI_PREFIX = "[oLLama AI]" -- Customizable message prefix
+_G.PLAYER_NAME_FORMAT = "{player}" -- Customizable format for player's name
 
 -- GUI SETUP --
 local screenGui = Instance.new("ScreenGui")
@@ -88,6 +91,18 @@ resetButton.Text = "Reset AI"
 resetButton.Font = Enum.Font.Gotham
 resetButton.TextSize = 20
 resetButton.Parent = settingsFrame
+
+-- TextBox to customize the player's name format --
+local nameFormatInput = Instance.new("TextBox")
+nameFormatInput.Size = UDim2.new(0, 200, 0, 50)
+nameFormatInput.Position = UDim2.new(0.5, -100, 0.5, -25)
+nameFormatInput.BackgroundColor3 = Color3.fromRGB(100, 100, 255)
+nameFormatInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+nameFormatInput.Text = _G.PLAYER_NAME_FORMAT  -- Default name format
+nameFormatInput.Font = Enum.Font.Gotham
+nameFormatInput.TextSize = 20
+nameFormatInput.ClearTextOnFocus = false
+nameFormatInput.Parent = settingsFrame
 
 -- DRAGGING FUNCTIONALITY --
 local dragging = false
@@ -181,6 +196,12 @@ closeButton.MouseButton1Click:Connect(function()
     settingsFrame.Visible = false
 end)
 
+-- Update the player name format when the user types a new one
+nameFormatInput.FocusLost:Connect(function()
+    _G.PLAYER_NAME_FORMAT = nameFormatInput.Text
+    warn("Player name format updated to: ".._G.PLAYER_NAME_FORMAT)
+end)
+
 -- AI MESSAGE HANDLING --
 local chat = function(_string)
     if game.TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
@@ -229,7 +250,7 @@ OnMessageDoneFiltering.OnClientEvent:Connect(function(Table)
 
     Debounce = true
 
-    local HttpRequest = MakeRequest("(note: dont use any line breaks and keep the messages shorter) "..Message)
+    local HttpRequest = MakeRequest(_G.AI_PREFIX.." (note: dont use any line breaks and keep the messages shorter) "..Message)
     print("["..Instance.Name.."]: "..Message)
     local Response = ""
     if HttpRequest.StatusCode == 200 then
@@ -239,8 +260,9 @@ OnMessageDoneFiltering.OnClientEvent:Connect(function(Table)
         if actualResponse == nil then
             warn("fix your script: response is nil")
         else 
-            Response = Instance.Name..", "..actualResponse
-            warn("[oLLama AI]: "..Response)
+            -- Use the custom name format here
+            Response = _G.PLAYER_NAME_FORMAT:gsub("{player}", Instance.Name)..", "..actualResponse
+            warn(_G.AI_PREFIX.." "..Response)
         end
     else
         warn("Request failed with status code: " .. HttpRequest.StatusCode)
@@ -255,4 +277,4 @@ OnMessageDoneFiltering.OnClientEvent:Connect(function(Table)
 end)
 
 warn("Script has been executed with success.")
-chat("[oLLama AI] Llama 3.1 Model Loaded!") -- Updated to reflect the new model
+chat(_G.AI_PREFIX.." Llama 3.1 Model Loaded!")
