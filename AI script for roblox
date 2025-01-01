@@ -1,0 +1,250 @@
+-- SETTINGS --
+local AI_ACTIVE = true -- Flag to turn AI on and off
+local CLOSE_RANGE_ONLY = true;
+
+_G.MESSAGE_SETTINGS = {
+    ["MINIMUM_CHARACTERS"] = 1,
+    ["MAXIMUM_CHARACTERS"] = 200,
+    ["MAXIMUM_STUDS"] = 11,
+};
+
+_G.WHITELISTED = { -- Only works if CLOSE_RANGE_ONLY is disabled
+    ["seem2006"] = true,
+};
+
+_G.BLACKLISTED = { -- Only works if CLOSE_RANGE_ONLY is enabled
+    ["Builderman"] = true,
+};
+
+-- GUI SETUP --
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "PersistentScreenGui"
+screenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+
+-- Make sure the UI does not get destroyed upon respawn
+screenGui.ResetOnSpawn = false
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 300, 0, 200)
+frame.Position = UDim2.new(0.5, -150, 0.5, -100)
+frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+frame.BackgroundTransparency = 0.5
+frame.Parent = screenGui
+
+local toggleButton = Instance.new("TextButton")
+toggleButton.Size = UDim2.new(0, 200, 0, 50)
+toggleButton.Position = UDim2.new(0.5, -100, 0.5, -25)
+toggleButton.BackgroundColor3 = Color3.fromRGB(50, 50, 255)
+toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleButton.Text = "Turn AI OFF"
+toggleButton.Font = Enum.Font.Gotham
+toggleButton.TextSize = 20
+toggleButton.Parent = frame
+
+local settingsButton = Instance.new("TextButton")
+settingsButton.Size = UDim2.new(0, 200, 0, 50)
+settingsButton.Position = UDim2.new(0.5, -100, 0.5, 25)
+settingsButton.BackgroundColor3 = Color3.fromRGB(50, 50, 255)
+settingsButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+settingsButton.Text = "Settings"
+settingsButton.Font = Enum.Font.Gotham
+settingsButton.TextSize = 20
+settingsButton.Parent = frame
+
+local closeButton = Instance.new("TextButton")
+closeButton.Size = UDim2.new(0, 30, 0, 30)
+closeButton.Position = UDim2.new(1, -35, 0, -35)
+closeButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeButton.Text = "X"
+closeButton.Font = Enum.Font.Gotham
+closeButton.TextSize = 16
+closeButton.Parent = frame
+
+local settingsFrame = Instance.new("Frame")
+settingsFrame.Size = UDim2.new(0, 300, 0, 200)
+settingsFrame.Position = UDim2.new(0.5, -150, 0.5, -100)
+settingsFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+settingsFrame.BackgroundTransparency = 0.5
+settingsFrame.Visible = false
+settingsFrame.Parent = screenGui
+
+local aiToggleButton = Instance.new("TextButton")
+aiToggleButton.Size = UDim2.new(0, 200, 0, 50)
+aiToggleButton.Position = UDim2.new(0.5, -100, 0.5, -75)
+aiToggleButton.BackgroundColor3 = Color3.fromRGB(50, 255, 50)
+aiToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+aiToggleButton.Text = "Toggle AI"
+aiToggleButton.Font = Enum.Font.Gotham
+aiToggleButton.TextSize = 20
+aiToggleButton.Parent = settingsFrame
+
+local resetButton = Instance.new("TextButton")
+resetButton.Size = UDim2.new(0, 200, 0, 50)
+resetButton.Position = UDim2.new(0.5, -100, 0.5, 25)
+resetButton.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+resetButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+resetButton.Text = "Reset AI"
+resetButton.Font = Enum.Font.Gotham
+resetButton.TextSize = 20
+resetButton.Parent = settingsFrame
+
+-- DRAGGING FUNCTIONALITY --
+local dragging = false
+local dragInput, dragStart, startPos
+
+frame.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = frame.Position
+    end
+end)
+
+frame.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = false
+    end
+end)
+
+frame.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+local settingsDragging = false
+local settingsDragInput, settingsDragStart, settingsStartPos
+
+settingsFrame.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        settingsDragging = true
+        settingsDragStart = input.Position
+        settingsStartPos = settingsFrame.Position
+    end
+end)
+
+settingsFrame.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        settingsDragging = false
+    end
+end)
+
+settingsFrame.InputChanged:Connect(function(input)
+    if settingsDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - settingsDragStart
+        settingsFrame.Position = UDim2.new(settingsStartPos.X.Scale, settingsStartPos.X.Offset + delta.X, settingsStartPos.Y.Scale, settingsStartPos.Y.Offset + delta.Y)
+    end
+end)
+
+-- AI TOGGLE FUNCTION --
+local function toggleAI()
+    AI_ACTIVE = not AI_ACTIVE
+    if AI_ACTIVE then
+        toggleButton.Text = "Turn AI OFF"
+        warn("[AI] AI is now ON.")
+    else
+        toggleButton.Text = "Turn AI ON"
+        warn("[AI] AI is now OFF.")
+    end
+end
+
+toggleButton.MouseButton1Click:Connect(toggleAI)
+
+-- Reset AI button functionality
+resetButton.MouseButton1Click:Connect(function()
+    AI_ACTIVE = false
+    toggleButton.Text = "Turn AI ON"
+    warn("[AI] AI has been reset and turned OFF.")
+end)
+
+-- Open settings frame
+settingsButton.MouseButton1Click:Connect(function()
+    settingsFrame.Visible = not settingsFrame.Visible
+end)
+
+-- Close settings frame (close button)
+closeButton.MouseButton1Click:Connect(function()
+    settingsFrame.Visible = false
+end)
+
+-- AI MESSAGE HANDLING WITH NEW ROBLOX CHAT SYSTEM --
+local TextChatService = game:GetService("TextChatService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local HttpService = game:GetService("HttpService")
+local LocalPlayer = Players.LocalPlayer
+local Debounce = false
+
+local RequestFunction = syn and syn.request or request
+
+local function MakeRequest(Prompt)
+    return RequestFunction({
+        Url = "http://localhost:11434/api/generate",
+        Method = "POST",
+        Headers = {
+            ["Content-Type"] = "application/json"
+        },
+        Body = game:GetService("HttpService"):JSONEncode({
+            model = "llama3.1", -- Updated to use Llama 3.1
+            prompt = Prompt,
+            stream = false
+        })
+    })
+end
+
+local function sendChatMessage(message)
+    -- Ensure the message is being sent to the correct channel
+    local channel = TextChatService:GetChannel("RBXGeneral")
+    if channel then
+        channel:SendAsync(message) -- Send AI's response to the chat
+    else
+        warn("Error: Chat channel not found.")
+    end
+end
+
+local OnMessageDoneFiltering = ReplicatedStorage:WaitForChild("DefaultChatSystemChatEvents"):WaitForChild("OnMessageDoneFiltering")
+
+OnMessageDoneFiltering.OnClientEvent:Connect(function(Table)
+    if not AI_ACTIVE then return end -- Skip if AI is off
+    local Message, Instance = Table.Message, Players:FindFirstChild(Table.FromSpeaker)
+    local Character = Instance and Instance.Character
+
+    if Instance == LocalPlayer or string.match(Message, "#") or not Character or not Character:FindFirstChild("Head") or not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("Head") then return end
+    if Debounce or #Message < _G.MESSAGE_SETTINGS["MINIMUM_CHARACTERS"] or #Message > _G.MESSAGE_SETTINGS["MAXIMUM_CHARACTERS"] then return end
+    if CLOSE_RANGE_ONLY then 
+        if _G.BLACKLISTED[Instance.Name] or (Character.Head.Position - LocalPlayer.Character.Head.Position).Magnitude > _G.MESSAGE_SETTINGS["MAXIMUM_STUDS"] then return end
+    elseif not _G.WHITELISTED[Instance.Name] then return end
+
+    Debounce = true
+
+    local HttpRequest = MakeRequest("(note: dont use any line breaks and keep the messages shorter) "..Message)
+    print("["..Instance.Name.."]: "..Message)
+    local Response = ""
+    if HttpRequest.StatusCode == 200 then
+        local responseData = game:GetService("HttpService"):JSONDecode(HttpRequest.Body)
+        local actualResponse = responseData.response
+
+        if actualResponse == nil then
+            warn("fix your script: response is nil")
+        else 
+            Response = Instance.Name..", "..actualResponse
+            warn("[oLLama AI]: "..Response)
+        end
+    else
+        warn("Request failed with status code: " .. HttpRequest.StatusCode)
+    end
+
+    sendChatMessage(string.sub(Response, 1, 128))
+    delay(1, function()
+        sendChatMessage(string.sub(Response, 129))
+        wait()
+        Debounce = false
+    end)
+end)
+
+-- Send the initial AI load message
+sendChatMessage("[oLLama AI] Llama 3.1 Model Loaded!") -- Updated to reflect the new model
