@@ -140,6 +140,16 @@ settingsFrame.InputChanged:Connect(function(input)
     end
 end)
 
+-- Function to handle smooth animation for hiding and showing the frame
+local function toggleFrameVisibility()
+    frame.Visible = not frame.Visible
+    if frame.Visible then
+        frame:TweenPosition(UDim2.new(0.5, -150, 0.5, -100), "Out", "Quad", 0.5, true)
+    else
+        frame:TweenPosition(UDim2.new(0.5, -150, 0.5, 200), "In", "Quad", 0.5, true)
+    end
+end
+
 -- AI TOGGLE FUNCTION --
 local function toggleAI()
     AI_ACTIVE = not AI_ACTIVE
@@ -171,11 +181,21 @@ closeButton.MouseButton1Click:Connect(function()
     settingsFrame.Visible = false
 end)
 
--- AI MESSAGE HANDLING WITH NEW ROBLOX CHAT SYSTEM --
-local TextChatService = game:GetService("TextChatService")
+-- AI MESSAGE HANDLING --
+local chat = function(_string)
+    if game.TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+        print("FIRING ".._string.."...")
+        game.TextChatService.TextChannels.RBXGeneral:SendAsync(_string, "All")
+        warn("FIRED!")
+    else
+        game:GetService('ReplicatedStorage').DefaultChatSystemChatEvents.SayMessageRequest:FireServer(_string, 'All')
+    end
+end
+
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
+local OnMessageDoneFiltering = ReplicatedStorage:WaitForChild("DefaultChatSystemChatEvents"):WaitForChild("OnMessageDoneFiltering")
 local LocalPlayer = Players.LocalPlayer
 local Debounce = false
 
@@ -195,18 +215,6 @@ local function MakeRequest(Prompt)
         })
     })
 end
-
-local function sendChatMessage(message)
-    -- Ensure the message is being sent to the correct channel
-    local channel = TextChatService:GetChannel("RBXGeneral")
-    if channel then
-        channel:SendAsync(message) -- Send AI's response to the chat
-    else
-        warn("Error: Chat channel not found.")
-    end
-end
-
-local OnMessageDoneFiltering = ReplicatedStorage:WaitForChild("DefaultChatSystemChatEvents"):WaitForChild("OnMessageDoneFiltering")
 
 OnMessageDoneFiltering.OnClientEvent:Connect(function(Table)
     if not AI_ACTIVE then return end -- Skip if AI is off
@@ -238,13 +246,13 @@ OnMessageDoneFiltering.OnClientEvent:Connect(function(Table)
         warn("Request failed with status code: " .. HttpRequest.StatusCode)
     end
 
-    sendChatMessage(string.sub(Response, 1, 128))
+    chat(string.sub(Response, 1, 128))
     delay(1, function()
-        sendChatMessage(string.sub(Response, 129))
+        chat(string.sub(Response, 129))
         wait()
         Debounce = false
     end)
 end)
 
--- Send the initial AI load message
-sendChatMessage("[oLLama AI] Llama 3.1 Model Loaded!") -- Updated to reflect the new model
+warn("Script has been executed with success.")
+chat("[oLLama AI] Llama 3.1 Model Loaded!") -- Updated to reflect the new model
