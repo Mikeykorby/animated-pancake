@@ -1,3 +1,17 @@
+-- MEMORY SETUP -- 
+local memory = {}
+
+-- Add the memory of the current conversation
+local function addToMemory(message, response)
+    table.insert(memory, {message = message, response = response})
+end
+
+-- Reset memory function
+local function resetMemory()
+    memory = {}
+    warn("Memory has been reset!")
+end
+
 local AI_ACTIVE = true  -- Flag to turn AI on and off
 local CLOSE_RANGE_ONLY = true
 
@@ -85,7 +99,7 @@ resetButton.Size = UDim2.new(0, 200, 0, 40)  -- Smaller button size
 resetButton.Position = UDim2.new(0.5, -100, 0.5, -70)
 resetButton.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
 resetButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-resetButton.Text = "Reset AI"
+resetButton.Text = "Reset Memory"
 resetButton.Font = Enum.Font.Gotham
 resetButton.TextSize = 20
 resetButton.Parent = settingsFrame
@@ -201,6 +215,7 @@ end)
 resetButton.MouseButton1Click:Connect(function()
     _G.PLAYER_NAME_FORMAT = "P"
     nameFormatInput.Text = _G.PLAYER_NAME_FORMAT
+    resetMemory()  -- Reset memory when reset button is clicked
 end)
 
 -- Change the player name format dynamically --
