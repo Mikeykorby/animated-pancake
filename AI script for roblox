@@ -1,4 +1,3 @@
--- SETTINGS --
 local AI_ACTIVE = true  -- Flag to turn AI on and off
 local CLOSE_RANGE_ONLY = true
 
@@ -64,8 +63,8 @@ closeButton.TextSize = 16
 closeButton.Parent = frame
 
 local settingsFrame = Instance.new("Frame")
-settingsFrame.Size = UDim2.new(0, 400, 0, 300)  -- Reverted size of settings UI
-settingsFrame.Position = UDim2.new(0.5, -200, 0.5, -150)
+settingsFrame.Size = UDim2.new(0, 420, 0, 360)  -- Slightly bigger size to accommodate the reset memory option
+settingsFrame.Position = UDim2.new(0.5, -210, 0.5, -160)
 settingsFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)  -- Darker background
 settingsFrame.BackgroundTransparency = 0.5
 settingsFrame.Visible = false
@@ -73,7 +72,7 @@ settingsFrame.Parent = screenGui
 
 local aiToggleButton = Instance.new("TextButton")
 aiToggleButton.Size = UDim2.new(0, 200, 0, 40)  -- Smaller button size
-aiToggleButton.Position = UDim2.new(0.5, -100, 0.5, -100)
+aiToggleButton.Position = UDim2.new(0.5, -100, 0.5, -120)
 aiToggleButton.BackgroundColor3 = Color3.fromRGB(50, 255, 50)
 aiToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 aiToggleButton.Text = "Toggle AI"
@@ -83,7 +82,7 @@ aiToggleButton.Parent = settingsFrame
 
 local resetButton = Instance.new("TextButton")
 resetButton.Size = UDim2.new(0, 200, 0, 40)  -- Smaller button size
-resetButton.Position = UDim2.new(0.5, -100, 0.5, -50)
+resetButton.Position = UDim2.new(0.5, -100, 0.5, -70)
 resetButton.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
 resetButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 resetButton.Text = "Reset AI"
@@ -94,7 +93,7 @@ resetButton.Parent = settingsFrame
 -- TextBox to customize the player's name format --
 local nameFormatInput = Instance.new("TextBox")
 nameFormatInput.Size = UDim2.new(0, 200, 0, 40)  -- Smaller TextBox size
-nameFormatInput.Position = UDim2.new(0.5, -100, 0.5, 50)
+nameFormatInput.Position = UDim2.new(0.5, -100, 0.5, 20)
 nameFormatInput.BackgroundColor3 = Color3.fromRGB(100, 100, 255)
 nameFormatInput.TextColor3 = Color3.fromRGB(255, 255, 255)
 nameFormatInput.Text = _G.PLAYER_NAME_FORMAT  -- Default name format
@@ -106,7 +105,7 @@ nameFormatInput.Parent = settingsFrame
 -- Dropdown to choose separator (Comma or Colon)
 local separatorDropdown = Instance.new("TextButton")
 separatorDropdown.Size = UDim2.new(0, 200, 0, 40)  -- Smaller button size
-separatorDropdown.Position = UDim2.new(0.5, -100, 0.5, 100)
+separatorDropdown.Position = UDim2.new(0.5, -100, 0.5, 70)
 separatorDropdown.BackgroundColor3 = Color3.fromRGB(100, 255, 100)
 separatorDropdown.TextColor3 = Color3.fromRGB(255, 255, 255)
 separatorDropdown.Text = "Select Separator: Comma"
@@ -117,7 +116,7 @@ separatorDropdown.Parent = settingsFrame
 -- Checkbox to toggle the player's name prefix
 local toggleNamePrefixButton = Instance.new("TextButton")
 toggleNamePrefixButton.Size = UDim2.new(0, 200, 0, 40)  -- Smaller button size
-toggleNamePrefixButton.Position = UDim2.new(0.5, -100, 0.5, 150)
+toggleNamePrefixButton.Position = UDim2.new(0.5, -100, 0.5, 120)
 toggleNamePrefixButton.BackgroundColor3 = Color3.fromRGB(255, 255, 50)
 toggleNamePrefixButton.TextColor3 = Color3.fromRGB(0, 0, 0)
 toggleNamePrefixButton.Text = "Disable Name Prefix"
