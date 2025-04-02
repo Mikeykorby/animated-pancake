@@ -1,9 +1,17 @@
--- MEMORY SETUP -- 
+-- Roblox Chatbot Script with Ollama (LLaMA 3.1) and Velocity Executor
+-- Enhanced UI, supports both old 2017 chat and new TextChatService, memory for 30 messages, reopen button, smooth dragging, and direct Ollama requests
+
+-- MEMORY SETUP --
 local memory = {}
+local MAX_MEMORY = 30 -- Limit memory to 30 messages
 
 -- Add the memory of the current conversation
 local function addToMemory(message, response)
+    if #memory >= MAX_MEMORY then
+        table.remove(memory, 1) -- Remove the oldest entry if at limit
+    end
     table.insert(memory, {message = message, response = response})
+    warn("Memory updated. Current memory size: " .. #memory)
 end
 
 -- Reset memory function
@@ -34,163 +42,349 @@ _G.PLAYER_NAME_FORMAT = "P" -- Default player name format (just 'P')
 _G.NAME_SEPARATOR = ","  -- Default separator (can be comma or colon)
 
 -- GUI SETUP --
+local UserInputService = game:GetService("UserInputService")
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "PersistentScreenGui"
 screenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
 screenGui.ResetOnSpawn = false
+screenGui.IgnoreGuiInset = true
 
+-- Main Frame
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 400, 0, 250)  -- Reverted size of the main UI frame
-frame.Position = UDim2.new(0.5, -200, 0.5, -125)
-frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)  -- Darker background
-frame.BackgroundTransparency = 0.5
+frame.Size = UDim2.new(0, 300, 0, 200)
+frame.Position = UDim2.new(0.5, -150, 0.5, -100)
+frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+frame.BackgroundTransparency = 0.1
+frame.BorderSizePixel = 0
 frame.Parent = screenGui
 
+-- Rounded Corners for Main Frame
+local frameCorner = Instance.new("UICorner")
+frameCorner.CornerRadius = UDim.new(0, 10)
+frameCorner.Parent = frame
+
+-- Title Label
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Size = UDim2.new(1, 0, 0, 40)
+titleLabel.Position = UDim2.new(0, 0, 0, 0)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Text = "oLLama AI Chatbot"
+titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+titleLabel.Font = Enum.Font.GothamBold
+titleLabel.TextSize = 20
+titleLabel.Parent = frame
+
+-- Status Label
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(1, 0, 0, 20)
+statusLabel.Position = UDim2.new(0, 0, 0, 40)
+statusLabel.BackgroundTransparency = 1
+statusLabel.Text = "Status: Idle"
+statusLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+statusLabel.Font = Enum.Font.Gotham
+statusLabel.TextSize = 14
+statusLabel.Parent = frame
+
+-- Toggle AI Button
 local toggleButton = Instance.new("TextButton")
-toggleButton.Size = UDim2.new(0, 200, 0, 40)  -- Smaller button size
-toggleButton.Position = UDim2.new(0.5, -100, 0.5, -75)
-toggleButton.BackgroundColor3 = Color3.fromRGB(50, 50, 255)
+toggleButton.Size = UDim2.new(0, 200, 0, 40)
+toggleButton.Position = UDim2.new(0.5, -100, 0.5, -20)
+toggleButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
 toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 toggleButton.Text = "Turn AI OFF"
 toggleButton.Font = Enum.Font.Gotham
-toggleButton.TextSize = 20
+toggleButton.TextSize = 16
+toggleButton.BorderSizePixel = 0
 toggleButton.Parent = frame
 
+local toggleButtonCorner = Instance.new("UICorner")
+toggleButtonCorner.CornerRadius = UDim.new(0, 8)
+toggleButtonCorner.Parent = toggleButton
+
+-- Hover Effect for Toggle Button
+toggleButton.MouseEnter:Connect(function()
+    toggleButton.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+end)
+toggleButton.MouseLeave:Connect(function()
+    toggleButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+end)
+
+-- Settings Button
 local settingsButton = Instance.new("TextButton")
-settingsButton.Size = UDim2.new(0, 200, 0, 40)  -- Smaller button size
-settingsButton.Position = UDim2.new(0.5, -100, 0.5, 25)
-settingsButton.BackgroundColor3 = Color3.fromRGB(50, 50, 255)
+settingsButton.Size = UDim2.new(0, 200, 0, 40)
+settingsButton.Position = UDim2.new(0.5, -100, 0.5, 30)
+settingsButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
 settingsButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 settingsButton.Text = "Settings"
 settingsButton.Font = Enum.Font.Gotham
-settingsButton.TextSize = 20
+settingsButton.TextSize = 16
+settingsButton.BorderSizePixel = 0
 settingsButton.Parent = frame
 
+local settingsButtonCorner = Instance.new("UICorner")
+settingsButtonCorner.CornerRadius = UDim.new(0, 8)
+settingsButtonCorner.Parent = settingsButton
+
+-- Hover Effect for Settings Button
+settingsButton.MouseEnter:Connect(function()
+    settingsButton.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+end)
+settingsButton.MouseLeave:Connect(function()
+    settingsButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+end)
+
+-- Close Button
 local closeButton = Instance.new("TextButton")
 closeButton.Size = UDim2.new(0, 30, 0, 30)
-closeButton.Position = UDim2.new(1, -35, 0, -35)
-closeButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+closeButton.Position = UDim2.new(1, -40, 0, 5)
+closeButton.BackgroundColor3 = Color3.fromRGB(255, 85, 85)
 closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 closeButton.Text = "X"
-closeButton.Font = Enum.Font.Gotham
+closeButton.Font = Enum.Font.GothamBold
 closeButton.TextSize = 16
+closeButton.BorderSizePixel = 0
 closeButton.Parent = frame
 
+local closeButtonCorner = Instance.new("UICorner")
+closeButtonCorner.CornerRadius = UDim.new(0, 8)
+closeButtonCorner.Parent = closeButton
+
+-- Hover Effect for Close Button
+closeButton.MouseEnter:Connect(function()
+    closeButton.BackgroundColor3 = Color3.fromRGB(255, 115, 115)
+end)
+closeButton.MouseLeave:Connect(function()
+    closeButton.BackgroundColor3 = Color3.fromRGB(255, 85, 85)
+end)
+
+-- Reopen Button (Initially Hidden)
+local reopenButton = Instance.new("TextButton")
+reopenButton.Size = UDim2.new(0, 40, 0, 40)
+reopenButton.Position = UDim2.new(0, 10, 0.5, -20)
+reopenButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+reopenButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+reopenButton.Text = ">"
+reopenButton.Font = Enum.Font.GothamBold
+reopenButton.TextSize = 20
+reopenButton.BorderSizePixel = 0
+reopenButton.Visible = false
+reopenButton.Parent = screenGui
+
+local reopenButtonCorner = Instance.new("UICorner")
+reopenButtonCorner.CornerRadius = UDim.new(0, 8)
+reopenButtonCorner.Parent = reopenButton
+
+-- Hover Effect for Reopen Button
+reopenButton.MouseEnter:Connect(function()
+    reopenButton.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+end)
+reopenButton.MouseLeave:Connect(function()
+    reopenButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+end)
+
+-- Settings Frame
 local settingsFrame = Instance.new("Frame")
-settingsFrame.Size = UDim2.new(0, 420, 0, 360)  -- Slightly bigger size to accommodate the reset memory option
-settingsFrame.Position = UDim2.new(0.5, -210, 0.5, -160)
-settingsFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)  -- Darker background
-settingsFrame.BackgroundTransparency = 0.5
+settingsFrame.Size = UDim2.new(0, 350, 0, 400)
+settingsFrame.Position = UDim2.new(0.5, -175, 0.5, -200)
+settingsFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+settingsFrame.BackgroundTransparency = 0.1
+settingsFrame.BorderSizePixel = 0
 settingsFrame.Visible = false
 settingsFrame.Parent = screenGui
 
+local settingsFrameCorner = Instance.new("UICorner")
+settingsFrameCorner.CornerRadius = UDim.new(0, 10)
+settingsFrameCorner.Parent = settingsFrame
+
+-- Settings Title
+local settingsTitle = Instance.new("TextLabel")
+settingsTitle.Size = UDim2.new(1, 0, 0, 40)
+settingsTitle.Position = UDim2.new(0, 0, 0, 0)
+settingsTitle.BackgroundTransparency = 1
+settingsTitle.Text = "Settings"
+settingsTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+settingsTitle.Font = Enum.Font.GothamBold
+settingsTitle.TextSize = 20
+settingsTitle.Parent = settingsFrame
+
+-- AI Toggle Button (Settings)
 local aiToggleButton = Instance.new("TextButton")
-aiToggleButton.Size = UDim2.new(0, 200, 0, 40)  -- Smaller button size
-aiToggleButton.Position = UDim2.new(0.5, -100, 0.5, -120)
-aiToggleButton.BackgroundColor3 = Color3.fromRGB(50, 255, 50)
+aiToggleButton.Size = UDim2.new(0, 250, 0, 40)
+aiToggleButton.Position = UDim2.new(0.5, -125, 0, 60)
+aiToggleButton.BackgroundColor3 = Color3.fromRGB(85, 170, 85)
 aiToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 aiToggleButton.Text = "Toggle AI"
 aiToggleButton.Font = Enum.Font.Gotham
-aiToggleButton.TextSize = 20
+aiToggleButton.TextSize = 16
+aiToggleButton.BorderSizePixel = 0
 aiToggleButton.Parent = settingsFrame
 
+local aiToggleButtonCorner = Instance.new("UICorner")
+aiToggleButtonCorner.CornerRadius = UDim.new(0, 8)
+aiToggleButtonCorner.Parent = aiToggleButton
+
+-- Hover Effect for AI Toggle Button
+aiToggleButton.MouseEnter:Connect(function()
+    aiToggleButton.BackgroundColor3 = Color3.fromRGB(115, 200, 115)
+end)
+aiToggleButton.MouseLeave:Connect(function()
+    aiToggleButton.BackgroundColor3 = Color3.fromRGB(85, 170, 85)
+end)
+
+-- Reset Memory Button
 local resetButton = Instance.new("TextButton")
-resetButton.Size = UDim2.new(0, 200, 0, 40)  -- Smaller button size
-resetButton.Position = UDim2.new(0.5, -100, 0.5, -70)
-resetButton.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+resetButton.Size = UDim2.new(0, 250, 0, 40)
+resetButton.Position = UDim2.new(0.5, -125, 0, 110)
+resetButton.BackgroundColor3 = Color3.fromRGB(255, 85, 85)
 resetButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 resetButton.Text = "Reset Memory"
 resetButton.Font = Enum.Font.Gotham
-resetButton.TextSize = 20
+resetButton.TextSize = 16
+resetButton.BorderSizePixel = 0
 resetButton.Parent = settingsFrame
 
--- TextBox to customize the player's name format --
+local resetButtonCorner = Instance.new("UICorner")
+resetButtonCorner.CornerRadius = UDim.new(0, 8)
+resetButtonCorner.Parent = resetButton
+
+-- Hover Effect for Reset Button
+resetButton.MouseEnter:Connect(function()
+    resetButton.BackgroundColor3 = Color3.fromRGB(255, 115, 115)
+end)
+resetButton.MouseLeave:Connect(function()
+    resetButton.BackgroundColor3 = Color3.fromRGB(255, 85, 85)
+end)
+
+-- TextBox to Customize Player Name Format
+local nameFormatLabel = Instance.new("TextLabel")
+nameFormatLabel.Size = UDim2.new(0, 250, 0, 20)
+nameFormatLabel.Position = UDim2.new(0.5, -125, 0, 160)
+nameFormatLabel.BackgroundTransparency = 1
+nameFormatLabel.Text = "Player Name Format:"
+nameFormatLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+nameFormatLabel.Font = Enum.Font.Gotham
+nameFormatLabel.TextSize = 14
+nameFormatLabel.Parent = settingsFrame
+
 local nameFormatInput = Instance.new("TextBox")
-nameFormatInput.Size = UDim2.new(0, 200, 0, 40)  -- Smaller TextBox size
-nameFormatInput.Position = UDim2.new(0.5, -100, 0.5, 20)
-nameFormatInput.BackgroundColor3 = Color3.fromRGB(100, 100, 255)
+nameFormatInput.Size = UDim2.new(0, 250, 0, 40)
+nameFormatInput.Position = UDim2.new(0.5, -125, 0, 180)
+nameFormatInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 nameFormatInput.TextColor3 = Color3.fromRGB(255, 255, 255)
-nameFormatInput.Text = _G.PLAYER_NAME_FORMAT  -- Default name format
+nameFormatInput.Text = _G.PLAYER_NAME_FORMAT
 nameFormatInput.Font = Enum.Font.Gotham
-nameFormatInput.TextSize = 20
+nameFormatInput.TextSize = 16
 nameFormatInput.ClearTextOnFocus = false
+nameFormatInput.BorderSizePixel = 0
 nameFormatInput.Parent = settingsFrame
 
--- Dropdown to choose separator (Comma or Colon)
+local nameFormatInputCorner = Instance.new("UICorner")
+nameFormatInputCorner.CornerRadius = UDim.new(0, 8)
+nameFormatInputCorner.Parent = nameFormatInput
+
+-- Separator Dropdown
+local separatorLabel = Instance.new("TextLabel")
+separatorLabel.Size = UDim2.new(0, 250, 0, 20)
+separatorLabel.Position = UDim2.new(0.5, -125, 0, 230)
+separatorLabel.BackgroundTransparency = 1
+separatorLabel.Text = "Name Separator:"
+separatorLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+separatorLabel.Font = Enum.Font.Gotham
+separatorLabel.TextSize = 14
+separatorLabel.Parent = settingsFrame
+
 local separatorDropdown = Instance.new("TextButton")
-separatorDropdown.Size = UDim2.new(0, 200, 0, 40)  -- Smaller button size
-separatorDropdown.Position = UDim2.new(0.5, -100, 0.5, 70)
-separatorDropdown.BackgroundColor3 = Color3.fromRGB(100, 255, 100)
+separatorDropdown.Size = UDim2.new(0, 250, 0, 40)
+separatorDropdown.Position = UDim2.new(0.5, -125, 0, 250)
+separatorDropdown.BackgroundColor3 = Color3.fromRGB(50, 170, 50)
 separatorDropdown.TextColor3 = Color3.fromRGB(255, 255, 255)
 separatorDropdown.Text = "Select Separator: Comma"
 separatorDropdown.Font = Enum.Font.Gotham
-separatorDropdown.TextSize = 20
+separatorDropdown.TextSize = 16
+separatorDropdown.BorderSizePixel = 0
 separatorDropdown.Parent = settingsFrame
 
--- Checkbox to toggle the player's name prefix
+local separatorDropdownCorner = Instance.new("UICorner")
+separatorDropdownCorner.CornerRadius = UDim.new(0, 8)
+separatorDropdownCorner.Parent = separatorDropdown
+
+-- Hover Effect for Separator Dropdown
+separatorDropdown.MouseEnter:Connect(function()
+    separatorDropdown.BackgroundColor3 = Color3.fromRGB(80, 200, 80)
+end)
+separatorDropdown.MouseLeave:Connect(function()
+    separatorDropdown.BackgroundColor3 = Color3.fromRGB(50, 170, 50)
+end)
+
+-- Toggle Name Prefix Button
 local toggleNamePrefixButton = Instance.new("TextButton")
-toggleNamePrefixButton.Size = UDim2.new(0, 200, 0, 40)  -- Smaller button size
-toggleNamePrefixButton.Position = UDim2.new(0.5, -100, 0.5, 120)
-toggleNamePrefixButton.BackgroundColor3 = Color3.fromRGB(255, 255, 50)
-toggleNamePrefixButton.TextColor3 = Color3.fromRGB(0, 0, 0)
+toggleNamePrefixButton.Size = UDim2.new(0, 250, 0, 40)
+toggleNamePrefixButton.Position = UDim2.new(0.5, -125, 0, 300)
+toggleNamePrefixButton.BackgroundColor3 = Color3.fromRGB(255, 170, 0)
+toggleNamePrefixButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 toggleNamePrefixButton.Text = "Disable Name Prefix"
 toggleNamePrefixButton.Font = Enum.Font.Gotham
-toggleNamePrefixButton.TextSize = 20
+toggleNamePrefixButton.TextSize = 16
+toggleNamePrefixButton.BorderSizePixel = 0
 toggleNamePrefixButton.Parent = settingsFrame
 
--- DRAGGING FUNCTIONALITY --
-local dragging = false
-local dragInput, dragStart, startPos
+local toggleNamePrefixButtonCorner = Instance.new("UICorner")
+toggleNamePrefixButtonCorner.CornerRadius = UDim.new(0, 8)
+toggleNamePrefixButtonCorner.Parent = toggleNamePrefixButton
 
-frame.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = true
-        dragStart = input.Position
-        startPos = frame.Position
-    end
+-- Hover Effect for Toggle Name Prefix Button
+toggleNamePrefixButton.MouseEnter:Connect(function()
+    toggleNamePrefixButton.BackgroundColor3 = Color3.fromRGB(255, 200, 50)
+end)
+toggleNamePrefixButton.MouseLeave:Connect(function()
+    toggleNamePrefixButton.BackgroundColor3 = Color3.fromRGB(255, 170, 0)
 end)
 
-frame.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = false
-    end
-end)
+-- SMOOTH DRAGGING FUNCTIONALITY --
+local function makeDraggable(frame)
+    local dragging = false
+    local dragStart, startPos
 
-frame.InputChanged:Connect(function(input)
-    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-        local delta = input.Position - dragStart
-        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-    end
-end)
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            local position = input.Position
+            local guiPosition = frame.Position
+            local guiSize = frame.Size
+            local guiX = guiPosition.X.Scale * game:GetService("GuiService"):GetScreenResolution().X + guiPosition.X.Offset
+            local guiY = guiPosition.Y.Scale * game:GetService("GuiService"):GetScreenResolution().Y + guiPosition.Y.Offset
+            local guiWidth = guiSize.X.Scale * game:GetService("GuiService"):GetScreenResolution().X + guiSize.X.Offset
+            local guiHeight = guiSize.Y.Scale * game:GetService("GuiService"):GetScreenResolution().Y + guiSize.Y.Offset
 
-local settingsDragging = false
-local settingsDragInput, settingsDragStart, settingsStartPos
+            if position.X >= guiX and position.X <= guiX + guiWidth and position.Y >= guiY and position.Y <= guiY + guiHeight then
+                dragging = true
+                dragStart = position
+                startPos = frame.Position
+            end
+        end
+    end)
 
-settingsFrame.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        settingsDragging = true
-        settingsDragStart = input.Position
-        settingsStartPos = settingsFrame.Position
-    end
-end)
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
 
-settingsFrame.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        settingsDragging = false
-    end
-end)
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - dragStart
+            local newX = startPos.X.Offset + delta.X
+            local newY = startPos.Y.Offset + delta.Y
+            frame.Position = UDim2.new(startPos.X.Scale, newX, startPos.Y.Scale, newY)
+        end
+    end)
+end
 
-settingsFrame.InputChanged:Connect(function(input)
-    if settingsDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-        local delta = input.Position - settingsDragStart
-        settingsFrame.Position = UDim2.new(settingsStartPos.X.Scale, settingsStartPos.X.Offset + delta.X, settingsStartPos.Y.Scale, settingsStartPos.Y.Offset + delta.Y)
-    end
-end)
+-- Apply smooth dragging to both frames
+makeDraggable(frame)
+makeDraggable(settingsFrame)
 
 -- SETTINGS HANDLERS --
-
 local function toggleFrameVisibility()
     settingsFrame.Visible = not settingsFrame.Visible
 end
@@ -198,6 +392,7 @@ end
 local function toggleAI()
     AI_ACTIVE = not AI_ACTIVE
     toggleButton.Text = AI_ACTIVE and "Turn AI OFF" or "Turn AI ON"
+    statusLabel.Text = AI_ACTIVE and "Status: Active" or "Status: Inactive"
 end
 
 settingsButton.MouseButton1Click:Connect(function()
@@ -205,7 +400,15 @@ settingsButton.MouseButton1Click:Connect(function()
 end)
 
 closeButton.MouseButton1Click:Connect(function()
-    screenGui:Destroy()
+    frame.Visible = false
+    settingsFrame.Visible = false
+    reopenButton.Visible = true
+end)
+
+reopenButton.MouseButton1Click:Connect(function()
+    frame.Visible = true
+    reopenButton.Visible = false
+    frame.Position = UDim2.new(0.5, -150, 0.5, -100) -- Reset position to center
 end)
 
 aiToggleButton.MouseButton1Click:Connect(function()
@@ -215,7 +418,7 @@ end)
 resetButton.MouseButton1Click:Connect(function()
     _G.PLAYER_NAME_FORMAT = "P"
     nameFormatInput.Text = _G.PLAYER_NAME_FORMAT
-    resetMemory()  -- Reset memory when reset button is clicked
+    resetMemory()
 end)
 
 -- Change the player name format dynamically --
@@ -227,7 +430,7 @@ end)
 -- Handle Separator Dropdown for Comma or Colon --
 separatorDropdown.MouseButton1Click:Connect(function()
     _G.NAME_SEPARATOR = (_G.NAME_SEPARATOR == ",") and ":" or ","
-    separatorDropdown.Text = "Select Separator: " .. _G.NAME_SEPARATOR
+    separatorDropdown.Text = "Select Separator: " .. (_G.NAME_SEPARATOR == "," and "Comma" or "Colon")
     warn("Separator updated to: " .. _G.NAME_SEPARATOR)
 end)
 
@@ -246,20 +449,34 @@ end)
 
 -- AI RESPONSE HANDLING --
 local chat = function(_string)
+    warn("Attempting to send message: " .. _string)
     if game.TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
         print("FIRING ".._string.."...")
-        game.TextChatService.TextChannels.RBXGeneral:SendAsync(_string, "All")
-        warn("FIRED!")
+        local success, err = pcall(function()
+            game.TextChatService.TextChannels.RBXGeneral:SendAsync(_string, "All")
+        end)
+        if not success then
+            warn("Failed to send message via TextChatService: "..err)
+        else
+            warn("FIRED via TextChatService!")
+        end
     else
-        game:GetService('ReplicatedStorage').DefaultChatSystemChatEvents.SayMessageRequest:FireServer(_string, 'All')
+        local success, err = pcall(function()
+            game:GetService('ReplicatedStorage').DefaultChatSystemChatEvents.SayMessageRequest:FireServer(_string, 'All')
+        end)
+        if not success then
+            warn("Failed to send message via legacy chat: "..err)
+        else
+            warn("FIRED via legacy chat!")
+        end
     end
 end
 
--- Handling the response from AI --
+-- Handling chat messages and responses --
+local TextChatService = game:GetService("TextChatService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
-local OnMessageDoneFiltering = ReplicatedStorage:WaitForChild("DefaultChatSystemChatEvents"):WaitForChild("OnMessageDoneFiltering")
 local LocalPlayer = Players.LocalPlayer
 local Debounce = false
 
@@ -280,21 +497,56 @@ local function MakeRequest(Prompt)
     })
 end
 
-OnMessageDoneFiltering.OnClientEvent:Connect(function(Table)
-    if not AI_ACTIVE then return end -- Skip if AI is off
-    local Message, Instance = Table.Message, Players:FindFirstChild(Table.FromSpeaker)
-    local Character = Instance and Instance.Character
-
-    if Instance == LocalPlayer or string.match(Message, "#") or not Character or not Character:FindFirstChild("Head") or not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("Head") then return end
-    if Debounce or #Message < _G.MESSAGE_SETTINGS["MINIMUM_CHARACTERS"] or #Message > _G.MESSAGE_SETTINGS["MAXIMUM_CHARACTERS"] then return end
+-- Function to process messages (shared between both chat systems)
+local function processMessage(Message, player, Character)
+    warn("Processing message from " .. player.Name .. ": " .. Message)
+    if not AI_ACTIVE then
+        warn("AI is not active, skipping message.")
+        return
+    end
+    if player == LocalPlayer then
+        warn("Message from local player, skipping.")
+        return
+    end
+    if string.match(Message, "#") then
+        warn("Message contains '#', skipping.")
+        return
+    end
+    if not Character or not Character:FindFirstChild("Head") then
+        warn("Player character or head not found, skipping.")
+        return
+    end
+    if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("Head") then
+        warn("Local player character or head not found, skipping.")
+        return
+    end
+    if Debounce then
+        warn("Debounce active, skipping.")
+        return
+    end
+    if #Message < _G.MESSAGE_SETTINGS["MINIMUM_CHARACTERS"] or #Message > _G.MESSAGE_SETTINGS["MAXIMUM_CHARACTERS"] then
+        warn("Message length out of bounds (" .. #Message .. "), skipping.")
+        return
+    end
     if CLOSE_RANGE_ONLY then 
-        if _G.BLACKLISTED[Instance.Name] or (Character.Head.Position - LocalPlayer.Character.Head.Position).Magnitude > _G.MESSAGE_SETTINGS["MAXIMUM_STUDS"] then return end
-    elseif not _G.WHITELISTED[Instance.Name] then return end
+        if _G.BLACKLISTED[player.Name] then
+            warn("Player " .. player.Name .. " is blacklisted, skipping.")
+            return
+        end
+        if (Character.Head.Position - LocalPlayer.Character.Head.Position).Magnitude > _G.MESSAGE_SETTINGS["MAXIMUM_STUDS"] then
+            warn("Player " .. player.Name .. " is too far (" .. (Character.Head.Position - LocalPlayer.Character.Head.Position).Magnitude .. " studs), skipping.")
+            return
+        end
+    elseif not _G.WHITELISTED[player.Name] then
+        warn("Player " .. player.Name .. " is not whitelisted, skipping.")
+        return
+    end
 
     Debounce = true
+    statusLabel.Text = "Status: Processing..."
 
     local HttpRequest = MakeRequest(_G.AI_PREFIX.." (note: dont use any line breaks and keep the messages shorter) "..Message)
-    print("["..Instance.Name.."]: "..Message)
+    print("["..player.Name.."]: "..Message)
     local Response = ""
     if HttpRequest.StatusCode == 200 then
         local responseData = game:GetService("HttpService"):JSONDecode(HttpRequest.Body)
@@ -302,23 +554,92 @@ OnMessageDoneFiltering.OnClientEvent:Connect(function(Table)
 
         if actualResponse == nil then
             warn("fix your script: response is nil")
+            Response = _G.AI_PREFIX .. " Sorry, I couldn't respond. Try again!"
         else 
             -- Use the custom name format and separator here
-            local playerName = _G.PLAYER_NAME_FORMAT == "P" and Instance.Name or (_G.PLAYER_NAME_FORMAT == "" and "" or _G.PLAYER_NAME_FORMAT)
-            Response = playerName .. (_G.PLAYER_NAME_FORMAT == "" and "" or _G.NAME_SEPARATOR) .. " " .. actualResponse
-            warn(_G.AI_PREFIX.." "..Response)
+            local playerName = _G.PLAYER_NAME_FORMAT == "P" and player.Name or (_G.PLAYER_NAME_FORMAT == "" and "" or _G.PLAYER_NAME_FORMAT)
+            Response = _G.AI_PREFIX .. " " .. playerName .. (_G.PLAYER_NAME_FORMAT == "" and "" or _G.NAME_SEPARATOR) .. " " .. actualResponse
+            warn("Sending: "..Response)
+            -- Add to memory
+            addToMemory(Message, actualResponse)
         end
     else
         warn("Request failed with status code: " .. HttpRequest.StatusCode)
+        Response = _G.AI_PREFIX .. " Sorry, I couldn't respond. Try again!"
     end
 
     chat(string.sub(Response, 1, 128))
-    delay(1, function()
-        chat(string.sub(Response, 129))
-        wait()
-        Debounce = false
+    if #Response > 128 then
+        delay(1, function()
+            chat(string.sub(Response, 129))
+        end)
+    end
+    wait()
+    statusLabel.Text = AI_ACTIVE and "Status: Active" or "Status: Inactive"
+    Debounce = false
+end
+
+-- Detect messages using TextChatService (new chat system)
+if TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+    local channel = TextChatService.TextChannels.RBXGeneral
+    if not channel then
+        warn("RBXGeneral channel not found. Attempting to find another channel...")
+        for _, chan in pairs(TextChatService.TextChannels:GetChildren()) do
+            if chan:IsA("TextChannel") then
+                channel = chan
+                warn("Found channel: " .. chan.Name)
+                break
+            end
+        end
+    end
+    if channel then
+        warn("Listening for messages on channel: " .. channel.Name)
+        channel.MessageReceived:Connect(function(message)
+            warn("Message received via TextChatService: " .. message.Text)
+            local sender = message.TextSource
+            if not sender then
+                warn("No sender found for message.")
+                return
+            end
+            local player = Players:GetPlayerByUserId(sender.UserId)
+            if not player then
+                warn("No player found for sender ID: " .. sender.UserId)
+                return
+            end
+            local Message = message.Text
+            local Character = player.Character
+            processMessage(Message, player, Character)
+        end)
+    else
+        warn("No TextChatService channel found. New chat system will not work.")
+    end
+end
+
+-- Detect messages using legacy chat system (2017 chat)
+local success, err = pcall(function()
+    local OnMessageDoneFiltering = ReplicatedStorage:WaitForChild("DefaultChatSystemChatEvents", 5):WaitForChild("OnMessageDoneFiltering", 5)
+    warn("Legacy chat system found, setting up listener...")
+    OnMessageDoneFiltering.OnClientEvent:Connect(function(Table)
+        warn("Message received via legacy chat: " .. Table.Message)
+        local Message, Instance = Table.Message, Players:FindFirstChild(Table.FromSpeaker)
+        local Character = Instance and Instance.Character
+        processMessage(Message, Instance, Character)
     end)
 end)
+if not success then
+    warn("Failed to set up legacy chat listener: " .. err)
+end
 
+-- Test Ollama connection on startup
+local testRequest = MakeRequest("Test connection")
+if testRequest.StatusCode == 200 then
+    warn("Ollama connection successful!")
+else
+    warn("Ollama connection failed with status code: " .. testRequest.StatusCode)
+end
+
+-- Send initial message with delay to ensure chat system is ready
 warn("Script has been executed with success.")
-chat(_G.AI_PREFIX.." Llama 3.1 Model Loaded!")
+delay(2, function()
+    chat(_G.AI_PREFIX.." LLaMA 3.1 Model Loaded!")
+end)
