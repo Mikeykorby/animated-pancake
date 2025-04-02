@@ -1,5 +1,5 @@
 -- Roblox Chatbot Script with Ollama (LLaMA 3.1) and Velocity Executor
--- Enhanced UI, supports both old 2017 chat and new TextChatService, memory for 30 messages, reopen button, smooth dragging, and direct Ollama requests
+-- Enhanced UI, supports both old 2017 chat and new TextChatService, memory for 30 messages, reopen button, smooth dragging, and dynamic prefix based on name format
 
 -- MEMORY SETUP --
 local memory = {}
@@ -37,7 +37,6 @@ _G.BLACKLISTED = { -- Only works if CLOSE_RANGE_ONLY is enabled
     ["Builderman"] = true,
 }
 
-_G.AI_PREFIX = "[oLLama AI]" -- Customizable message prefix
 _G.PLAYER_NAME_FORMAT = "P" -- Default player name format (just 'P')
 _G.NAME_SEPARATOR = ","  -- Default separator (can be comma or colon)
 
@@ -545,7 +544,7 @@ local function processMessage(Message, player, Character)
     Debounce = true
     statusLabel.Text = "Status: Processing..."
 
-    local HttpRequest = MakeRequest(_G.AI_PREFIX.." (note: dont use any line breaks and keep the messages shorter) "..Message)
+    local HttpRequest = MakeRequest("(note: dont use any line breaks and keep the messages shorter) "..Message)
     print("["..player.Name.."]: "..Message)
     local Response = ""
     if HttpRequest.StatusCode == 200 then
@@ -554,18 +553,27 @@ local function processMessage(Message, player, Character)
 
         if actualResponse == nil then
             warn("fix your script: response is nil")
-            Response = _G.AI_PREFIX .. " Sorry, I couldn't respond. Try again!"
+            Response = "Sorry, I couldn't respond. Try again!"
         else 
-            -- Use the custom name format and separator here
-            local playerName = _G.PLAYER_NAME_FORMAT == "P" and player.Name or (_G.PLAYER_NAME_FORMAT == "" and "" or _G.PLAYER_NAME_FORMAT)
-            Response = _G.AI_PREFIX .. " " .. playerName .. (_G.PLAYER_NAME_FORMAT == "" and "" or _G.NAME_SEPARATOR) .. " " .. actualResponse
+            -- Dynamically set the prefix based on _G.PLAYER_NAME_FORMAT
+            local prefix = ""
+            if _G.PLAYER_NAME_FORMAT == "ollama" then
+                prefix = "[oLLama AI] " .. player.Name .. _G.NAME_SEPARATOR .. " "
+            elseif _G.PLAYER_NAME_FORMAT == "P" then
+                prefix = player.Name .. _G.NAME_SEPARATOR .. " "
+            elseif _G.PLAYER_NAME_FORMAT == "" then
+                prefix = "" -- No prefix if the name format is empty
+            else
+                prefix = _G.PLAYER_NAME_FORMAT .. " " .. player.Name .. _G.NAME_SEPARATOR .. " "
+            end
+            Response = prefix .. actualResponse
             warn("Sending: "..Response)
             -- Add to memory
             addToMemory(Message, actualResponse)
         end
     else
         warn("Request failed with status code: " .. HttpRequest.StatusCode)
-        Response = _G.AI_PREFIX .. " Sorry, I couldn't respond. Try again!"
+        Response = "Sorry, I couldn't respond. Try again!"
     end
 
     chat(string.sub(Response, 1, 128))
@@ -641,5 +649,5 @@ end
 -- Send initial message with delay to ensure chat system is ready
 warn("Script has been executed with success.")
 delay(2, function()
-    chat(_G.AI_PREFIX.." LLaMA 3.1 Model Loaded!")
+    chat("LLaMA 3.1 Model Loaded!")
 end)
