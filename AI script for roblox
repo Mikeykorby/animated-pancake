@@ -183,8 +183,8 @@ end)
 
 -- Settings Frame
 local settingsFrame = Instance.new("Frame")
-settingsFrame.Size = UDim2.new(0, 350, 0, 400)
-settingsFrame.Position = UDim2.new(0.5, -175, 0.5, -200)
+settingsFrame.Size = UDim2.new(0, 350, 0, 500)
+settingsFrame.Position = UDim2.new(0.5, -175, 0.5, -250)
 settingsFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 settingsFrame.BackgroundTransparency = 0.1
 settingsFrame.BorderSizePixel = 0
@@ -337,6 +337,41 @@ toggleNamePrefixButton.MouseEnter:Connect(function()
 end)
 toggleNamePrefixButton.MouseLeave:Connect(function()
     toggleNamePrefixButton.BackgroundColor3 = Color3.fromRGB(255, 170, 0)
+end)
+
+-- Memory Limit Label and TextBox
+local memoryLimitLabel = Instance.new("TextLabel")
+memoryLimitLabel.Size = UDim2.new(0, 250, 0, 20)
+memoryLimitLabel.Position = UDim2.new(0.5, -125, 0, 350)
+memoryLimitLabel.BackgroundTransparency = 1
+memoryLimitLabel.Text = "memory limit"
+memoryLimitLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+memoryLimitLabel.Font = Enum.Font.Gotham
+memoryLimitLabel.TextSize = 14
+memoryLimitLabel.Parent = settingsFrame
+
+local memoryLimitInput = Instance.new("TextBox")
+memoryLimitInput.Size = UDim2.new(0, 250, 0, 40)
+memoryLimitInput.Position = UDim2.new(0.5, -125, 0, 370)
+memoryLimitInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+memoryLimitInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+memoryLimitInput.Text = tostring(MAX_MEMORY)
+memoryLimitInput.Font = Enum.Font.Gotham
+memoryLimitInput.TextSize = 16
+memoryLimitInput.ClearTextOnFocus = false
+memoryLimitInput.BorderSizePixel = 0
+memoryLimitInput.Parent = settingsFrame
+
+local memoryLimitInputCorner = Instance.new("UICorner")
+memoryLimitInputCorner.CornerRadius = UDim.new(0, 8)
+memoryLimitInputCorner.Parent = memoryLimitInput
+
+-- Update MAX_MEMORY when focus is lost
+memoryLimitInput.FocusLost:Connect(function()
+    local newLimit = tonumber(memoryLimitInput.Text) or 30
+    MAX_MEMORY = math.clamp(newLimit, 1, 100) -- Limit between 1 and 100
+    memoryLimitInput.Text = tostring(MAX_MEMORY)
+    warn("Memory limit updated to: " .. MAX_MEMORY)
 end)
 
 -- SMOOTH DRAGGING FUNCTIONALITY --
@@ -544,37 +579,46 @@ local function processMessage(Message, player, Character)
     Debounce = true
     statusLabel.Text = "Status: Processing..."
 
-    local HttpRequest = MakeRequest("(note: dont use any line breaks and keep the messages shorter) "..Message)
-    print("["..player.Name.."]: "..Message)
     local Response = ""
-    if HttpRequest.StatusCode == 200 then
-        local responseData = game:GetService("HttpService"):JSONDecode(HttpRequest.Body)
-        local actualResponse = responseData.response
-
-        if actualResponse == nil then
-            warn("fix your script: response is nil")
-            Response = "Sorry, I couldn't respond. Try again!"
-        else 
-            -- Dynamically set the prefix based on _G.PLAYER_NAME_FORMAT
-            local prefix = ""
-            if _G.PLAYER_NAME_FORMAT == "ollama" then
-                prefix = "[oLLama AI] " .. player.Name .. _G.NAME_SEPARATOR .. " "
-            elseif _G.PLAYER_NAME_FORMAT == "P" then
-                prefix = player.Name .. _G.NAME_SEPARATOR .. " "
-            elseif _G.PLAYER_NAME_FORMAT == "" then
-                prefix = "" -- No prefix if the name format is empty
-            else
-                prefix = _G.PLAYER_NAME_FORMAT .. " " .. player.Name .. _G.NAME_SEPARATOR .. " "
-            end
-            Response = prefix .. actualResponse
-            warn("Sending: "..Response)
-            -- Add to memory
-            addToMemory(Message, actualResponse)
-        end
+    if string.lower(Message) == "what did i just say" and #memory > 0 then
+        -- Directly recall the last message from memory
+        Response = "You just said: " .. memory[#memory].message
     else
-        warn("Request failed with status code: " .. HttpRequest.StatusCode)
-        Response = "Sorry, I couldn't respond. Try again!"
+        -- Proceed with Ollama request, including last message for context
+        local context = #memory > 0 and "Last message: " .. memory[#memory].message .. ". Current message: " .. Message or Message
+        local Prompt = "(note: dont use any line breaks and keep the messages shorter) " .. context
+        local HttpRequest = MakeRequest(Prompt)
+        print("["..player.Name.."]: "..Message)
+        if HttpRequest.StatusCode == 200 then
+            local responseData = game:GetService("HttpService"):JSONDecode(HttpRequest.Body)
+            local actualResponse = responseData.response
+
+            if actualResponse == nil then
+                warn("fix your script: response is nil")
+                Response = "Sorry, I couldn't respond. Try again!"
+            else 
+                -- Dynamically set the prefix based on _G.PLAYER_NAME_FORMAT
+                local prefix = ""
+                if _G.PLAYER_NAME_FORMAT == "ollama" then
+                    prefix = "[oLLama AI] " .. player.Name .. _G.NAME_SEPARATOR .. " "
+                elseif _G.PLAYER_NAME_FORMAT == "P" then
+                    prefix = player.Name .. _G.NAME_SEPARATOR .. " "
+                elseif _G.PLAYER_NAME_FORMAT == "" then
+                    prefix = "" -- No prefix if the name format is empty
+                else
+                    prefix = _G.PLAYER_NAME_FORMAT .. " " .. player.Name .. _G.NAME_SEPARATOR .. " "
+                end
+                Response = prefix .. actualResponse
+                warn("Sending: "..Response)
+            end
+        else
+            warn("Request failed with status code: " .. HttpRequest.StatusCode)
+            Response = "Sorry, I couldn't respond. Try again!"
+        end
     end
+
+    -- Add to memory before sending response
+    addToMemory(Message, string.match(Response, "^%[.-%] .-: (.*)") or Response)
 
     chat(string.sub(Response, 1, 128))
     if #Response > 128 then
