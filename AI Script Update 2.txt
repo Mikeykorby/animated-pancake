@@ -1,0 +1,1075 @@
+-- Roblox Chatbot Script with Ollama, Gemini API, Groq API, and Local Hugging Face support
+-- Enhanced UI, supports both old 2017 chat and new TextChatService, memory for 30 messages per player, reopen button, smooth dragging, and dynamic prefix based on name format
+-- HUGGING FACE DOES NOT WORK RIGHT NOW! ILL FIX IT LATER!
+-- Use GROQ, its more efficient and if you dont know how to set up ollama or your pc is straight up trash its best for you
+
+-- MEMORY SETUP --
+local memory = {} -- Now stores memory per player: memory[playerName] = {messages}
+local MAX_MEMORY = 30 -- Limit memory to 30 messages per player
+
+-- API CONFIGURATION --
+local GEMINI_API_KEY = "gotta_use_your_own_key"
+local GEMINI_MODEL = "gemini-2.0-flash"
+local GROQ_API_KEY = "gotta_use_your_own_key" -- Replace with your Groq API key
+local GROQ_MODEL = "llama-3.1-8b-instant" -- Default to fastest model
+
+-- Local Hugging Face Settings
+local HF_USE_LOCAL = false -- Set to true to use local models
+local HF_LOCAL_MODEL = "microsoft/DialoGPT-medium"
+local HF_LOCAL_URL = "http://localhost:5000" -- Local inference server URL
+
+-- AI Provider Selection (0 = Ollama, 1 = Gemini, 2 = Groq, 3 = Hugging Face Local)
+local AI_PROVIDER = 0 -- Default to Ollama
+
+-- Add the memory of the current conversation for a specific player
+local function addToMemory(playerName, message, response)
+    -- Initialize memory for player if it doesn't exist
+    if not memory[playerName] then
+        memory[playerName] = {}
+    end
+    
+    local playerMemory = memory[playerName]
+    
+    if #playerMemory >= MAX_MEMORY then
+        table.remove(playerMemory, 1) -- Remove the oldest entry if at limit
+    end
+    table.insert(playerMemory, {message = message, response = response})
+    warn("Memory updated for " .. playerName .. ". Current memory size: " .. #playerMemory)
+end
+
+-- Get memory for a specific player
+local function getPlayerMemory(playerName)
+    return memory[playerName] or {}
+end
+
+-- Reset memory function (can reset all or specific player)
+local function resetMemory(playerName)
+    if playerName then
+        memory[playerName] = {}
+        warn("Memory has been reset for " .. playerName .. "!")
+    else
+        memory = {}
+        warn("All memory has been reset!")
+    end
+end
+
+-- Function to extract just the response text without prefix for memory
+local function extractResponseText(fullResponse)
+    -- Find the position of the separator in the response
+    local separatorPos = string.find(fullResponse, _G.NAME_SEPARATOR)
+    if separatorPos then
+        -- Return everything after the separator and space
+        return string.sub(fullResponse, separatorPos + 2) -- +2 to skip separator and space
+    end
+    -- If no separator found, return the original response (might be a memory recall response)
+    return fullResponse
+end
+
+local AI_ACTIVE = true  -- Flag to turn AI on and off
+local CLOSE_RANGE_ONLY = true
+
+_G.MESSAGE_SETTINGS = {
+    ["MINIMUM_CHARACTERS"] = 1,
+    ["MAXIMUM_CHARACTERS"] = 200,
+    ["MAXIMUM_STUDS"] = 11,
+}
+
+_G.WHITELISTED = { -- Only works if CLOSE_RANGE_ONLY is disabled
+    ["seem2006"] = true,
+}
+
+_G.BLACKLISTED = { -- Only works if CLOSE_RANGE_ONLY is enabled
+    ["Builderman"] = true,
+}
+
+_G.PLAYER_NAME_FORMAT = "P" -- Default player name format (just 'P')
+_G.NAME_SEPARATOR = ","  -- Default separator (can be comma or colon)
+
+-- GUI SETUP --
+local UserInputService = game:GetService("UserInputService")
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "PersistentScreenGui"
+screenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+screenGui.ResetOnSpawn = false
+screenGui.IgnoreGuiInset = true
+
+-- Main Frame
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 300, 0, 200)
+frame.Position = UDim2.new(0.5, -150, 0.5, -100)
+frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+frame.BackgroundTransparency = 0.1
+frame.BorderSizePixel = 0
+frame.Parent = screenGui
+
+-- Rounded Corners for Main Frame
+local frameCorner = Instance.new("UICorner")
+frameCorner.CornerRadius = UDim.new(0, 10)
+frameCorner.Parent = frame
+
+-- Title Label
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Size = UDim2.new(1, 0, 0, 40)
+titleLabel.Position = UDim2.new(0, 0, 0, 0)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Text = "oLLama AI Chatbot"
+titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+titleLabel.Font = Enum.Font.GothamBold
+titleLabel.TextSize = 20
+titleLabel.Parent = frame
+
+-- Status Label
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(1, 0, 0, 20)
+statusLabel.Position = UDim2.new(0, 0, 0, 40)
+statusLabel.BackgroundTransparency = 1
+statusLabel.Text = "Status: Idle"
+statusLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+statusLabel.Font = Enum.Font.Gotham
+statusLabel.TextSize = 14
+statusLabel.Parent = frame
+
+-- Toggle AI Button
+local toggleButton = Instance.new("TextButton")
+toggleButton.Size = UDim2.new(0, 200, 0, 40)
+toggleButton.Position = UDim2.new(0.5, -100, 0.5, -20)
+toggleButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleButton.Text = "Turn AI OFF"
+toggleButton.Font = Enum.Font.Gotham
+toggleButton.TextSize = 16
+toggleButton.BorderSizePixel = 0
+toggleButton.Parent = frame
+
+local toggleButtonCorner = Instance.new("UICorner")
+toggleButtonCorner.CornerRadius = UDim.new(0, 8)
+toggleButtonCorner.Parent = toggleButton
+
+-- Hover Effect for Toggle Button
+toggleButton.MouseEnter:Connect(function()
+    toggleButton.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+end)
+toggleButton.MouseLeave:Connect(function()
+    toggleButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+end)
+
+-- Settings Button
+local settingsButton = Instance.new("TextButton")
+settingsButton.Size = UDim2.new(0, 200, 0, 40)
+settingsButton.Position = UDim2.new(0.5, -100, 0.5, 30)
+settingsButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+settingsButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+settingsButton.Text = "Settings"
+settingsButton.Font = Enum.Font.Gotham
+settingsButton.TextSize = 16
+settingsButton.BorderSizePixel = 0
+settingsButton.Parent = frame
+
+local settingsButtonCorner = Instance.new("UICorner")
+settingsButtonCorner.CornerRadius = UDim.new(0, 8)
+settingsButtonCorner.Parent = settingsButton
+
+-- Hover Effect for Settings Button
+settingsButton.MouseEnter:Connect(function()
+    settingsButton.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+end)
+settingsButton.MouseLeave:Connect(function()
+    settingsButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+end)
+
+-- Close Button
+local closeButton = Instance.new("TextButton")
+closeButton.Size = UDim2.new(0, 30, 0, 30)
+closeButton.Position = UDim2.new(1, -40, 0, 5)
+closeButton.BackgroundColor3 = Color3.fromRGB(255, 85, 85)
+closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeButton.Text = "X"
+closeButton.Font = Enum.Font.GothamBold
+closeButton.TextSize = 16
+closeButton.BorderSizePixel = 0
+closeButton.Parent = frame
+
+local closeButtonCorner = Instance.new("UICorner")
+closeButtonCorner.CornerRadius = UDim.new(0, 8)
+closeButtonCorner.Parent = closeButton
+
+-- Hover Effect for Close Button
+closeButton.MouseEnter:Connect(function()
+    closeButton.BackgroundColor3 = Color3.fromRGB(255, 115, 115)
+end)
+closeButton.MouseLeave:Connect(function()
+    closeButton.BackgroundColor3 = Color3.fromRGB(255, 85, 85)
+end)
+
+-- Reopen Button (Initially Hidden)
+local reopenButton = Instance.new("TextButton")
+reopenButton.Size = UDim2.new(0, 40, 0, 40)
+reopenButton.Position = UDim2.new(0, 10, 0.5, -20)
+reopenButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+reopenButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+reopenButton.Text = ">"
+reopenButton.Font = Enum.Font.GothamBold
+reopenButton.TextSize = 20
+reopenButton.BorderSizePixel = 0
+reopenButton.Visible = false
+reopenButton.Parent = screenGui
+
+local reopenButtonCorner = Instance.new("UICorner")
+reopenButtonCorner.CornerRadius = UDim.new(0, 8)
+reopenButtonCorner.Parent = reopenButton
+
+-- Hover Effect for Reopen Button
+reopenButton.MouseEnter:Connect(function()
+    reopenButton.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+end)
+reopenButton.MouseLeave:Connect(function()
+    reopenButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+end)
+
+-- Settings Frame
+local settingsFrame = Instance.new("Frame")
+settingsFrame.Size = UDim2.new(0, 350, 0, 600) -- Increased height for all settings
+settingsFrame.Position = UDim2.new(0.5, -175, 0.5, -300)
+settingsFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+settingsFrame.BackgroundTransparency = 0.1
+settingsFrame.BorderSizePixel = 0
+settingsFrame.Visible = false
+settingsFrame.Parent = screenGui
+
+local settingsFrameCorner = Instance.new("UICorner")
+settingsFrameCorner.CornerRadius = UDim.new(0, 10)
+settingsFrameCorner.Parent = settingsFrame
+
+-- Settings Title
+local settingsTitle = Instance.new("TextLabel")
+settingsTitle.Size = UDim2.new(1, 0, 0, 40)
+settingsTitle.Position = UDim2.new(0, 0, 0, 0)
+settingsTitle.BackgroundTransparency = 1
+settingsTitle.Text = "Settings"
+settingsTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+settingsTitle.Font = Enum.Font.GothamBold
+settingsTitle.TextSize = 20
+settingsTitle.Parent = settingsFrame
+
+-- AI Toggle Button (Settings)
+local aiToggleButton = Instance.new("TextButton")
+aiToggleButton.Size = UDim2.new(0, 250, 0, 40)
+aiToggleButton.Position = UDim2.new(0.5, -125, 0, 60)
+aiToggleButton.BackgroundColor3 = Color3.fromRGB(85, 170, 85)
+aiToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+aiToggleButton.Text = "Toggle AI"
+aiToggleButton.Font = Enum.Font.Gotham
+aiToggleButton.TextSize = 16
+aiToggleButton.BorderSizePixel = 0
+aiToggleButton.Parent = settingsFrame
+
+local aiToggleButtonCorner = Instance.new("UICorner")
+aiToggleButtonCorner.CornerRadius = UDim.new(0, 8)
+aiToggleButtonCorner.Parent = aiToggleButton
+
+-- Hover Effect for AI Toggle Button
+aiToggleButton.MouseEnter:Connect(function()
+    aiToggleButton.BackgroundColor3 = Color3.fromRGB(115, 200, 115)
+end)
+aiToggleButton.MouseLeave:Connect(function()
+    aiToggleButton.BackgroundColor3 = Color3.fromRGB(85, 170, 85)
+end)
+
+-- Reset Memory Button
+local resetButton = Instance.new("TextButton")
+resetButton.Size = UDim2.new(0, 250, 0, 40)
+resetButton.Position = UDim2.new(0.5, -125, 0, 110)
+resetButton.BackgroundColor3 = Color3.fromRGB(255, 85, 85)
+resetButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+resetButton.Text = "Reset All Memory"
+resetButton.Font = Enum.Font.Gotham
+resetButton.TextSize = 16
+resetButton.BorderSizePixel = 0
+resetButton.Parent = settingsFrame
+
+local resetButtonCorner = Instance.new("UICorner")
+resetButtonCorner.CornerRadius = UDim.new(0, 8)
+resetButtonCorner.Parent = resetButton
+
+-- AI Selection Button (Ollama/Gemini/Groq/Hugging Face)
+local aiSelectButton = Instance.new("TextButton")
+aiSelectButton.Size = UDim2.new(0, 250, 0, 40)
+aiSelectButton.Position = UDim2.new(0.5, -125, 0, 160)
+aiSelectButton.BackgroundColor3 = Color3.fromRGB(170, 85, 170)
+aiSelectButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+aiSelectButton.Text = "AI: Ollama"
+aiSelectButton.Font = Enum.Font.Gotham
+aiSelectButton.TextSize = 16
+aiSelectButton.BorderSizePixel = 0
+aiSelectButton.Parent = settingsFrame
+
+local aiSelectButtonCorner = Instance.new("UICorner")
+aiSelectButtonCorner.CornerRadius = UDim.new(0, 8)
+aiSelectButtonCorner.Parent = aiSelectButton
+
+-- Hover Effect for AI Select Button
+aiSelectButton.MouseEnter:Connect(function()
+    aiSelectButton.BackgroundColor3 = Color3.fromRGB(200, 115, 200)
+end)
+aiSelectButton.MouseLeave:Connect(function()
+    aiSelectButton.BackgroundColor3 = Color3.fromRGB(170, 85, 170)
+end)
+
+-- Groq API Key Input
+local groqApiKeyLabel = Instance.new("TextLabel")
+groqApiKeyLabel.Size = UDim2.new(0, 250, 0, 20)
+groqApiKeyLabel.Position = UDim2.new(0.5, -125, 0, 210)
+groqApiKeyLabel.BackgroundTransparency = 1
+groqApiKeyLabel.Text = "Groq API Key:"
+groqApiKeyLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+groqApiKeyLabel.Font = Enum.Font.Gotham
+groqApiKeyLabel.TextSize = 14
+groqApiKeyLabel.Parent = settingsFrame
+
+local groqApiKeyInput = Instance.new("TextBox")
+groqApiKeyInput.Size = UDim2.new(0, 250, 0, 40)
+groqApiKeyInput.Position = UDim2.new(0.5, -125, 0, 230)
+groqApiKeyInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+groqApiKeyInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+groqApiKeyInput.Text = GROQ_API_KEY
+groqApiKeyInput.PlaceholderText = "Enter Groq API Key"
+groqApiKeyInput.Font = Enum.Font.Gotham
+groqApiKeyInput.TextSize = 16
+groqApiKeyInput.ClearTextOnFocus = false
+groqApiKeyInput.BorderSizePixel = 0
+groqApiKeyInput.Parent = settingsFrame
+
+local groqApiKeyInputCorner = Instance.new("UICorner")
+groqApiKeyInputCorner.CornerRadius = UDim.new(0, 8)
+groqApiKeyInputCorner.Parent = groqApiKeyInput
+
+-- Groq Model Dropdown
+local groqModelLabel = Instance.new("TextLabel")
+groqModelLabel.Size = UDim2.new(0, 250, 0, 20)
+groqModelLabel.Position = UDim2.new(0.5, -125, 0, 280)
+groqModelLabel.BackgroundTransparency = 1
+groqModelLabel.Text = "Groq Model:"
+groqModelLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+groqModelLabel.Font = Enum.Font.Gotham
+groqModelLabel.TextSize = 14
+groqModelLabel.Parent = settingsFrame
+
+local groqModelDropdown = Instance.new("TextButton")
+groqModelDropdown.Size = UDim2.new(0, 250, 0, 40)
+groqModelDropdown.Position = UDim2.new(0.5, -125, 0, 300)
+groqModelDropdown.BackgroundColor3 = Color3.fromRGB(50, 150, 200)
+groqModelDropdown.TextColor3 = Color3.fromRGB(255, 255, 255)
+groqModelDropdown.Text = "Model: " .. GROQ_MODEL
+groqModelDropdown.Font = Enum.Font.Gotham
+groqModelDropdown.TextSize = 14
+groqModelDropdown.BorderSizePixel = 0
+groqModelDropdown.Parent = settingsFrame
+
+local groqModelDropdownCorner = Instance.new("UICorner")
+groqModelDropdownCorner.CornerRadius = UDim.new(0, 8)
+groqModelDropdownCorner.Parent = groqModelDropdown
+
+-- Hover Effect for Model Dropdown
+groqModelDropdown.MouseEnter:Connect(function()
+    groqModelDropdown.BackgroundColor3 = Color3.fromRGB(80, 180, 230)
+end)
+groqModelDropdown.MouseLeave:Connect(function()
+    groqModelDropdown.BackgroundColor3 = Color3.fromRGB(50, 150, 200)
+end)
+
+-- Memory Limit Label and TextBox
+local memoryLimitLabel = Instance.new("TextLabel")
+memoryLimitLabel.Size = UDim2.new(0, 250, 0, 20)
+memoryLimitLabel.Position = UDim2.new(0.5, -125, 0, 350)
+memoryLimitLabel.BackgroundTransparency = 1
+memoryLimitLabel.Text = "Memory Limit (messages per player):"
+memoryLimitLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+memoryLimitLabel.Font = Enum.Font.Gotham
+memoryLimitLabel.TextSize = 14
+memoryLimitLabel.Parent = settingsFrame
+
+local memoryLimitInput = Instance.new("TextBox")
+memoryLimitInput.Size = UDim2.new(0, 250, 0, 40)
+memoryLimitInput.Position = UDim2.new(0.5, -125, 0, 370)
+memoryLimitInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+memoryLimitInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+memoryLimitInput.Text = tostring(MAX_MEMORY)
+memoryLimitInput.Font = Enum.Font.Gotham
+memoryLimitInput.TextSize = 16
+memoryLimitInput.ClearTextOnFocus = false
+memoryLimitInput.BorderSizePixel = 0
+memoryLimitInput.Parent = settingsFrame
+
+local memoryLimitInputCorner = Instance.new("UICorner")
+memoryLimitInputCorner.CornerRadius = UDim.new(0, 8)
+memoryLimitInputCorner.Parent = memoryLimitInput
+
+-- TextBox to Customize Player Name Format
+local nameFormatLabel = Instance.new("TextLabel")
+nameFormatLabel.Size = UDim2.new(0, 250, 0, 20)
+nameFormatLabel.Position = UDim2.new(0.5, -125, 0, 420)
+nameFormatLabel.BackgroundTransparency = 1
+nameFormatLabel.Text = "Player Name Format:"
+nameFormatLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+nameFormatLabel.Font = Enum.Font.Gotham
+nameFormatLabel.TextSize = 14
+nameFormatLabel.Parent = settingsFrame
+
+local nameFormatInput = Instance.new("TextBox")
+nameFormatInput.Size = UDim2.new(0, 250, 0, 40)
+nameFormatInput.Position = UDim2.new(0.5, -125, 0, 440)
+nameFormatInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+nameFormatInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+nameFormatInput.Text = _G.PLAYER_NAME_FORMAT
+nameFormatInput.Font = Enum.Font.Gotham
+nameFormatInput.TextSize = 16
+nameFormatInput.ClearTextOnFocus = false
+nameFormatInput.BorderSizePixel = 0
+nameFormatInput.Parent = settingsFrame
+
+local nameFormatInputCorner = Instance.new("UICorner")
+nameFormatInputCorner.CornerRadius = UDim.new(0, 8)
+nameFormatInputCorner.Parent = nameFormatInput
+
+-- Separator Dropdown (ADDED BACK)
+local separatorLabel = Instance.new("TextLabel")
+separatorLabel.Size = UDim2.new(0, 250, 0, 20)
+separatorLabel.Position = UDim2.new(0.5, -125, 0, 490)
+separatorLabel.BackgroundTransparency = 1
+separatorLabel.Text = "Name Separator:"
+separatorLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+separatorLabel.Font = Enum.Font.Gotham
+separatorLabel.TextSize = 14
+separatorLabel.Parent = settingsFrame
+
+local separatorDropdown = Instance.new("TextButton")
+separatorDropdown.Size = UDim2.new(0, 250, 0, 40)
+separatorDropdown.Position = UDim2.new(0.5, -125, 0, 510)
+separatorDropdown.BackgroundColor3 = Color3.fromRGB(50, 170, 50)
+separatorDropdown.TextColor3 = Color3.fromRGB(255, 255, 255)
+separatorDropdown.Text = "Select Separator: Comma"
+separatorDropdown.Font = Enum.Font.Gotham
+separatorDropdown.TextSize = 16
+separatorDropdown.BorderSizePixel = 0
+separatorDropdown.Parent = settingsFrame
+
+local separatorDropdownCorner = Instance.new("UICorner")
+separatorDropdownCorner.CornerRadius = UDim.new(0, 8)
+separatorDropdownCorner.Parent = separatorDropdown
+
+-- Hover Effect for Separator Dropdown
+separatorDropdown.MouseEnter:Connect(function()
+    separatorDropdown.BackgroundColor3 = Color3.fromRGB(80, 200, 80)
+end)
+separatorDropdown.MouseLeave:Connect(function()
+    separatorDropdown.BackgroundColor3 = Color3.fromRGB(50, 170, 50)
+end)
+
+-- Toggle Name Prefix Button (ADDED BACK)
+local toggleNamePrefixButton = Instance.new("TextButton")
+toggleNamePrefixButton.Size = UDim2.new(0, 250, 0, 40)
+toggleNamePrefixButton.Position = UDim2.new(0.5, -125, 0, 560)
+toggleNamePrefixButton.BackgroundColor3 = Color3.fromRGB(255, 170, 0)
+toggleNamePrefixButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleNamePrefixButton.Text = "Disable Name Prefix"
+toggleNamePrefixButton.Font = Enum.Font.Gotham
+toggleNamePrefixButton.TextSize = 16
+toggleNamePrefixButton.BorderSizePixel = 0
+toggleNamePrefixButton.Parent = settingsFrame
+
+local toggleNamePrefixButtonCorner = Instance.new("UICorner")
+toggleNamePrefixButtonCorner.CornerRadius = UDim.new(0, 8)
+toggleNamePrefixButtonCorner.Parent = toggleNamePrefixButton
+
+-- Hover Effect for Toggle Name Prefix Button
+toggleNamePrefixButton.MouseEnter:Connect(function()
+    toggleNamePrefixButton.BackgroundColor3 = Color3.fromRGB(255, 200, 50)
+end)
+toggleNamePrefixButton.MouseLeave:Connect(function()
+    toggleNamePrefixButton.BackgroundColor3 = Color3.fromRGB(255, 170, 0)
+end)
+
+-- Update MAX_MEMORY when focus is lost
+memoryLimitInput.FocusLost:Connect(function()
+    local newLimit = tonumber(memoryLimitInput.Text) or 30
+    MAX_MEMORY = math.clamp(newLimit, 1, 100) -- Limit between 1 and 100
+    memoryLimitInput.Text = tostring(MAX_MEMORY)
+    warn("Memory limit updated to: " .. MAX_MEMORY)
+end)
+
+-- SMOOTH DRAGGING FUNCTIONALITY --
+local function makeDraggable(frame)
+    local dragging = false
+    local dragStart, startPos
+
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            local position = input.Position
+            local guiPosition = frame.Position
+            local guiSize = frame.Size
+            local guiX = guiPosition.X.Scale * game:GetService("GuiService"):GetScreenResolution().X + guiPosition.X.Offset
+            local guiY = guiPosition.Y.Scale * game:GetService("GuiService"):GetScreenResolution().Y + guiPosition.Y.Offset
+            local guiWidth = guiSize.X.Scale * game:GetService("GuiService"):GetScreenResolution().X + guiSize.X.Offset
+            local guiHeight = guiSize.Y.Scale * game:GetService("GuiService"):GetScreenResolution().Y + guiSize.Y.Offset
+
+            if position.X >= guiX and position.X <= guiX + guiWidth and position.Y >= guiY and position.Y <= guiY + guiHeight then
+                dragging = true
+                dragStart = position
+                startPos = frame.Position
+            end
+        end
+    end)
+
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - dragStart
+            local newX = startPos.X.Offset + delta.X
+            local newY = startPos.Y.Offset + delta.Y
+            frame.Position = UDim2.new(startPos.X.Scale, newX, startPos.Y.Scale, newY)
+        end
+    end)
+end
+
+-- Apply smooth dragging to both frames
+makeDraggable(frame)
+makeDraggable(settingsFrame)
+
+-- SETTINGS HANDLERS --
+local function toggleFrameVisibility()
+    settingsFrame.Visible = not settingsFrame.Visible
+end
+
+local function toggleAI()
+    AI_ACTIVE = not AI_ACTIVE
+    toggleButton.Text = AI_ACTIVE and "Turn AI OFF" or "Turn AI ON"
+    statusLabel.Text = AI_ACTIVE and "Status: Active" or "Status: Inactive"
+end
+
+local function toggleAIProvider()
+    AI_PROVIDER = (AI_PROVIDER + 1) % 4 -- Cycle through 0, 1, 2, 3
+    
+    if AI_PROVIDER == 0 then
+        aiSelectButton.Text = "AI: Ollama"
+        titleLabel.Text = "oLLama AI Chatbot"
+    elseif AI_PROVIDER == 1 then
+        aiSelectButton.Text = "AI: Gemini"
+        titleLabel.Text = "Gemini AI Chatbot"
+    elseif AI_PROVIDER == 2 then
+        aiSelectButton.Text = "AI: Groq"
+        titleLabel.Text = "Groq AI Chatbot"
+    else
+        aiSelectButton.Text = "AI: Hugging Face"
+        titleLabel.Text = "Hugging Face AI Chatbot"
+    end
+    warn("AI provider switched to: " .. aiSelectButton.Text)
+end
+
+-- Groq Model Dropdown Handler - Updated with current production models
+local GROQ_MODELS = {
+    "llama-3.1-8b-instant",           -- 560 tps, $0.05/$0.08
+    "llama-3.3-70b-versatile",        -- 280 tps, $0.59/$0.79
+    "openai/gpt-oss-120b",            -- 500 tps, $0.15/$0.75
+    "openai/gpt-oss-20b",             -- 1000 tps, $0.10/$0.50
+    "meta-llama/llama-guard-4-12b",   -- 1200 tps, $0.20/$0.20
+    "qwen/qwen3-32b"                  -- 400 tps, $0.29/$0.59
+}
+
+groqModelDropdown.MouseButton1Click:Connect(function()
+    -- Cycle through available Groq models
+    local currentIndex = 1
+    for i, model in ipairs(GROQ_MODELS) do
+        if model == GROQ_MODEL then
+            currentIndex = i
+            break
+        end
+    end
+    
+    local nextIndex = (currentIndex % #GROQ_MODELS) + 1
+    GROQ_MODEL = GROQ_MODELS[nextIndex]
+    groqModelDropdown.Text = "Model: " .. GROQ_MODEL
+    warn("Groq model changed to: " .. GROQ_MODEL)
+end)
+
+-- Update Groq API Key
+groqApiKeyInput.FocusLost:Connect(function()
+    GROQ_API_KEY = groqApiKeyInput.Text
+    warn("Groq API Key updated")
+end)
+
+-- Handle Separator Dropdown for Comma or Colon (ADDED BACK)
+separatorDropdown.MouseButton1Click:Connect(function()
+    _G.NAME_SEPARATOR = (_G.NAME_SEPARATOR == ",") and ":" or ","
+    separatorDropdown.Text = "Select Separator: " .. (_G.NAME_SEPARATOR == "," and "Comma" or "Colon")
+    warn("Separator updated to: " .. _G.NAME_SEPARATOR)
+end)
+
+-- Toggle Player Name Prefix (ADDED BACK)
+toggleNamePrefixButton.MouseButton1Click:Connect(function()
+    if _G.PLAYER_NAME_FORMAT == "P" then
+        _G.PLAYER_NAME_FORMAT = ""
+        toggleNamePrefixButton.Text = "Enable Name Prefix"
+    else
+        _G.PLAYER_NAME_FORMAT = "P"
+        toggleNamePrefixButton.Text = "Disable Name Prefix"
+    end
+    nameFormatInput.Text = _G.PLAYER_NAME_FORMAT
+    warn("Player name prefix toggled to: " .. (_G.PLAYER_NAME_FORMAT == "" and "Disabled" or "Enabled"))
+end)
+
+settingsButton.MouseButton1Click:Connect(function()
+    toggleFrameVisibility()
+end)
+
+closeButton.MouseButton1Click:Connect(function()
+    frame.Visible = false
+    settingsFrame.Visible = false
+    reopenButton.Visible = true
+end)
+
+reopenButton.MouseButton1Click:Connect(function()
+    frame.Visible = true
+    reopenButton.Visible = false
+    frame.Position = UDim2.new(0.5, -150, 0.5, -100) -- Reset position to center
+end)
+
+aiToggleButton.MouseButton1Click:Connect(function()
+    toggleAI()
+end)
+
+aiSelectButton.MouseButton1Click:Connect(function()
+    toggleAIProvider()
+end)
+
+resetButton.MouseButton1Click:Connect(function()
+    _G.PLAYER_NAME_FORMAT = "P"
+    nameFormatInput.Text = _G.PLAYER_NAME_FORMAT
+    resetMemory() -- Reset all memory
+end)
+
+-- Change the player name format dynamically --
+nameFormatInput.FocusLost:Connect(function()
+    _G.PLAYER_NAME_FORMAT = nameFormatInput.Text
+    warn("Player name format updated to: " .. _G.PLAYER_NAME_FORMAT)
+end)
+
+-- AI RESPONSE HANDLING --
+local chat = function(_string)
+    warn("Attempting to send message: " .. _string)
+    if game.TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+        print("FIRING ".._string.."...")
+        local success, err = pcall(function()
+            game.TextChatService.TextChannels.RBXGeneral:SendAsync(_string, "All")
+        end)
+        if not success then
+            warn("Failed to send message via TextChatService: "..err)
+        else
+            warn("FIRED via TextChatService!")
+        end
+    else
+        local success, err = pcall(function()
+            game:GetService('ReplicatedStorage').DefaultChatSystemChatEvents.SayMessageRequest:FireServer(_string, 'All')
+        end)
+        if not success then
+            warn("Failed to send message via legacy chat: "..err)
+        else
+            warn("FIRED via legacy chat!")
+        end
+    end
+end
+
+-- Handling chat messages and responses --
+local TextChatService = game:GetService("TextChatService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local HttpService = game:GetService("HttpService")
+local LocalPlayer = Players.LocalPlayer
+local Debounce = false
+
+local RequestFunction = syn and syn.request or request
+
+-- Ollama Request Function
+local function MakeOllamaRequest(Prompt)
+    return RequestFunction({
+        Url = "http://localhost:11434/api/generate",
+        Method = "POST",
+        Headers = {
+            ["Content-Type"] = "application/json"
+        },
+        Body = HttpService:JSONEncode({
+            model = "gemma3:1b-it-qat", 
+            prompt = Prompt,
+            stream = false
+        })
+    })
+end
+
+-- Gemini Request Function
+local function MakeGeminiRequest(Prompt)
+    return RequestFunction({
+        Url = "https://generativelanguage.googleapis.com/v1beta/models/" .. GEMINI_MODEL .. ":generateContent?key=" .. GEMINI_API_KEY,
+        Method = "POST",
+        Headers = {
+            ["Content-Type"] = "application/json"
+        },
+        Body = HttpService:JSONEncode({
+            contents = {{
+                parts = {{
+                    text = Prompt
+                }}
+            }},
+            generationConfig = {
+                maxOutputTokens = 100
+            }
+        })
+    })
+end
+
+-- Groq Request Function
+local function MakeGroqRequest(Prompt)
+    return RequestFunction({
+        Url = "https://api.groq.com/openai/v1/chat/completions",
+        Method = "POST",
+        Headers = {
+            ["Content-Type"] = "application/json",
+            ["Authorization"] = "Bearer " .. GROQ_API_KEY
+        },
+        Body = HttpService:JSONEncode({
+            messages = {{
+                role = "user",
+                content = Prompt
+            }},
+            model = GROQ_MODEL,
+            max_tokens = 100,
+            temperature = 0.7
+        })
+    })
+end
+
+-- Local Hugging Face Request Function
+local function MakeHuggingFaceRequest(Prompt)
+    -- For local inference server (like text-generation-webui or similar)
+    return RequestFunction({
+        Url = HF_LOCAL_URL .. "/v1/completions",
+        Method = "POST",
+        Headers = {
+            ["Content-Type"] = "application/json"
+        },
+        Body = HttpService:JSONEncode({
+            prompt = Prompt,
+            max_tokens = 100,
+            temperature = 0.7,
+            do_sample = true
+        })
+    })
+end
+
+-- Function to build conversation context from player's memory
+local function buildConversationContext(playerName, currentMessage)
+    local playerMemory = getPlayerMemory(playerName)
+    local context = ""
+    
+    if #playerMemory > 0 then
+        context = "Previous conversation with " .. playerName .. ":\n"
+        for i, entry in ipairs(playerMemory) do
+            context = context .. playerName .. ": " .. entry.message .. "\n"
+            -- Just use the clean response without "You:" prefix
+            context = context .. entry.response .. "\n"
+        end
+        context = context .. "Current message from " .. playerName .. ": " .. currentMessage
+    else
+        context = "First message from " .. playerName .. ": " .. currentMessage
+    end
+    
+    return context
+end
+
+-- Function to create the final response with proper prefix
+local function createFinalResponse(playerName, aiResponse)
+    -- Dynamically set the prefix based on _G.PLAYER_NAME_FORMAT
+    local prefix = ""
+    
+    if _G.PLAYER_NAME_FORMAT == "P" then
+        -- Just player name with separator: "PlayerName: response"
+        prefix = playerName .. _G.NAME_SEPARATOR .. " "
+    elseif _G.PLAYER_NAME_FORMAT == "" then
+        -- No prefix at all: "response"
+        prefix = ""
+    elseif string.sub(_G.PLAYER_NAME_FORMAT, 1, 2) == "P " then
+        -- If starts with "P " then "PlayerName custom: response"
+        local customText = string.sub(_G.PLAYER_NAME_FORMAT, 3)
+        prefix = playerName .. " " .. customText .. _G.NAME_SEPARATOR .. " "
+    else
+        -- Custom prefix only: "qwe: response"
+        prefix = _G.PLAYER_NAME_FORMAT .. _G.NAME_SEPARATOR .. " "
+    end
+    
+    return prefix .. aiResponse
+end
+
+-- Function to process messages (shared between both chat systems)
+local function processMessage(Message, player, Character)
+    warn("Processing message from " .. player.Name .. ": " .. Message)
+    if not AI_ACTIVE then
+        warn("AI is not active, skipping message.")
+        return
+    end
+    if player == LocalPlayer then
+        warn("Message from local player, skipping.")
+        return
+    end
+    if string.match(Message, "#") then
+        warn("Message contains '#', skipping.")
+        return
+    end
+    if not Character or not Character:FindFirstChild("Head") then
+        warn("Player character or head not found, skipping.")
+        return
+    end
+    if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("Head") then
+        warn("Local player character or head not found, skipping.")
+        return
+    end
+    if Debounce then
+        warn("Debounce active, skipping.")
+        return
+    end
+    if #Message < _G.MESSAGE_SETTINGS["MINIMUM_CHARACTERS"] or #Message > _G.MESSAGE_SETTINGS["MAXIMUM_CHARACTERS"] then
+        warn("Message length out of bounds (" .. #Message .. "), skipping.")
+        return
+    end
+    if CLOSE_RANGE_ONLY then 
+        if _G.BLACKLISTED[player.Name] then
+            warn("Player " .. player.Name .. " is blacklisted, skipping.")
+            return
+        end
+        if (Character.Head.Position - LocalPlayer.Character.Head.Position).Magnitude > _G.MESSAGE_SETTINGS["MAXIMUM_STUDS"] then
+            warn("Player " .. player.Name .. " is too far (" .. (Character.Head.Position - LocalPlayer.Character.Head.Position).Magnitude .. " studs), skipping.")
+            return
+        end
+    elseif not _G.WHITELISTED[player.Name] then
+        warn("Player " .. player.Name .. " is not whitelisted, skipping.")
+        return
+    end
+
+    Debounce = true
+    statusLabel.Text = "Status: Processing..."
+
+    local Response = ""
+    local playerName = player.Name
+    
+    if string.lower(Message) == "what did i just say" then
+        local playerMemory = getPlayerMemory(playerName)
+        if #playerMemory > 0 then
+            local cleanResponse = "You just said: " .. playerMemory[#playerMemory].message
+            Response = createFinalResponse(playerName, cleanResponse)
+        else
+            local cleanResponse = "I don't remember you saying anything recently."
+            Response = createFinalResponse(playerName, cleanResponse)
+        end
+    else
+        -- Build conversation context from this specific player's memory
+        local context = buildConversationContext(playerName, Message)
+        local Prompt = "(note: dont use any line breaks and keep the messages shorter) " .. context
+        
+        local HttpRequest
+        if AI_PROVIDER == 0 then
+            warn("Using Ollama API for " .. playerName .. "...")
+            HttpRequest = MakeOllamaRequest(Prompt)
+        elseif AI_PROVIDER == 1 then
+            warn("Using Gemini API for " .. playerName .. "...")
+            HttpRequest = MakeGeminiRequest(Prompt)
+        elseif AI_PROVIDER == 2 then
+            warn("Using Groq API for " .. playerName .. "...")
+            HttpRequest = MakeGroqRequest(Prompt)
+        else
+            warn("Using Hugging Face Local for " .. playerName .. "...")
+            HttpRequest = MakeHuggingFaceRequest(Prompt)
+        end
+        
+        print("["..playerName.."]: "..Message)
+        
+        if HttpRequest.StatusCode == 200 then
+            local success, responseData = pcall(function()
+                return HttpService:JSONDecode(HttpRequest.Body)
+            end)
+            
+            if success then
+                local actualResponse
+                
+                if AI_PROVIDER == 0 then
+                    -- Parse Ollama response
+                    actualResponse = responseData.response
+                elseif AI_PROVIDER == 1 then
+                    -- Parse Gemini response
+                    actualResponse = responseData.candidates and responseData.candidates[1] and 
+                                   responseData.candidates[1].content and 
+                                   responseData.candidates[1].content.parts and 
+                                   responseData.candidates[1].content.parts[1] and 
+                                   responseData.candidates[1].content.parts[1].text
+                elseif AI_PROVIDER == 2 then
+                    -- Parse Groq response
+                    actualResponse = responseData.choices and responseData.choices[1] and 
+                                   responseData.choices[1].message and 
+                                   responseData.choices[1].message.content
+                else
+                    -- Parse Hugging Face local response
+                    actualResponse = responseData.choices and responseData.choices[1] and responseData.choices[1].text
+                end
+
+                if actualResponse == nil or actualResponse == "" then
+                    warn("AI response is empty or nil")
+                    Response = createFinalResponse(playerName, "Hmm, let me think about that...")
+                else 
+                    -- Clean up the response
+                    actualResponse = string.gsub(actualResponse, "\n", " ")
+                    actualResponse = string.gsub(actualResponse, "  ", " ")
+                    Response = createFinalResponse(playerName, actualResponse)
+                    warn("Sending: "..Response)
+                end
+            else
+                warn("Failed to parse JSON response: " .. HttpRequest.Body)
+                Response = createFinalResponse(playerName, "Sorry, I had trouble understanding that.")
+            end
+        else
+            warn("Request failed with status code: " .. HttpRequest.StatusCode)
+            if AI_PROVIDER == 2 then
+                if HttpRequest.StatusCode == 401 then
+                    Response = createFinalResponse(playerName, "Groq API key error. Check settings.")
+                elseif HttpRequest.StatusCode == 429 then
+                    Response = createFinalResponse(playerName, "Rate limit exceeded. Try again later.")
+                else
+                    Response = createFinalResponse(playerName, "Sorry, I couldn't respond right now.")
+                end
+            elseif AI_PROVIDER == 3 then
+                Response = createFinalResponse(playerName, "Local AI not available. Check server.")
+            else
+                Response = createFinalResponse(playerName, "Sorry, I couldn't respond. Try again!")
+            end
+        end
+    end
+
+    -- Add to this specific player's memory (store just the AI response text, not the full prefixed message)
+    local responseTextOnly = extractResponseText(Response)
+    addToMemory(playerName, Message, responseTextOnly)
+
+    chat(string.sub(Response, 1, 128))
+    if #Response > 128 then
+        delay(1, function()
+            chat(string.sub(Response, 129))
+        end)
+    end
+    wait()
+    statusLabel.Text = AI_ACTIVE and "Status: Active" or "Status: Inactive"
+    Debounce = false
+end
+
+-- Detect messages using TextChatService (new chat system)
+if TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+    local channel = TextChatService.TextChannels.RBXGeneral
+    if not channel then
+        warn("RBXGeneral channel not found. Attempting to find another channel...")
+        for _, chan in pairs(TextChatService.TextChannels:GetChildren()) do
+            if chan:IsA("TextChannel") then
+                channel = chan
+                warn("Found channel: " .. chan.Name)
+                break
+            end
+        end
+    end
+    if channel then
+        warn("Listening for messages on channel: " .. channel.Name)
+        channel.MessageReceived:Connect(function(message)
+            warn("Message received via TextChatService: " .. message.Text)
+            local sender = message.TextSource
+            if not sender then
+                warn("No sender found for message.")
+                return
+            end
+            local player = Players:GetPlayerByUserId(sender.UserId)
+            if not player then
+                warn("No player found for sender ID: " .. sender.UserId)
+                return
+            end
+            local Message = message.Text
+            local Character = player.Character
+            processMessage(Message, player, Character)
+        end)
+    else
+        warn("No TextChatService channel found. New chat system will not work.")
+    end
+end
+
+-- Detect messages using legacy chat system (2017 chat)
+local success, err = pcall(function()
+    local OnMessageDoneFiltering = ReplicatedStorage:WaitForChild("DefaultChatSystemChatEvents", 5):WaitForChild("OnMessageDoneFiltering", 5)
+    warn("Legacy chat system found, setting up listener...")
+    OnMessageDoneFiltering.OnClientEvent:Connect(function(Table)
+        warn("Message received via legacy chat: " .. Table.Message)
+        local Message, Instance = Table.Message, Players:FindFirstChild(Table.FromSpeaker)
+        local Character = Instance and Instance.Character
+        processMessage(Message, Instance, Character)
+    end)
+end)
+if not success then
+    warn("Failed to set up legacy chat listener: " .. err)
+end
+
+-- Test AI connection on startup
+local function testAIConnection()
+    if AI_PROVIDER == 0 then
+        local testRequest = MakeOllamaRequest("Test connection")
+        if testRequest.StatusCode == 200 then
+            warn("Ollama connection successful!")
+        else
+            warn("Ollama connection failed with status code: " .. testRequest.StatusCode)
+        end
+    elseif AI_PROVIDER == 1 then
+        local testRequest = MakeGeminiRequest("Test connection")
+        if testRequest.StatusCode == 200 then
+            warn("Gemini connection successful!")
+        else
+            warn("Gemini connection failed with status code: " .. testRequest.StatusCode)
+        end
+    elseif AI_PROVIDER == 2 then
+        if GROQ_API_KEY ~= "YOUR_GROQ_API_KEY_HERE" then
+            local testRequest = MakeGroqRequest("Test connection")
+            if testRequest.StatusCode == 200 then
+                warn("Groq connection successful!")
+            else
+                warn("Groq connection failed with status code: " .. testRequest.StatusCode)
+            end
+        end
+    else
+        local testRequest = MakeHuggingFaceRequest("Test connection")
+        if testRequest.StatusCode == 200 then
+            warn("Hugging Face local connection successful!")
+        else
+            warn("Hugging Face local connection failed with status code: " .. testRequest.StatusCode)
+        end
+    end
+end
+
+testAIConnection()
+
+-- Send initial message with delay to ensure chat system is ready
+warn("Script has been executed with success.")
+delay(2, function()
+    local providerName = ""
+    if AI_PROVIDER == 0 then
+        providerName = "Ollama"
+    elseif AI_PROVIDER == 1 then
+        providerName = "Gemini"
+    elseif AI_PROVIDER == 2 then
+        providerName = "Groq"
+    else
+        providerName = "Hugging Face"
+    end
+    chat("AI Chatbot Loaded! Using " .. providerName .. " with per-player memory")
+end)
