@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Chatbot Pro - Documentation</title>
+    <style>
+        :root {
+            --bg: #0d0d12;
+            --surface: #181820;
+            --accent: #38bdf8;
+            --text: #f8fafc;
+            --muted: #94a3b8;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+        .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+        header {
+            text-align: center;
+            padding: 3rem 0;
+            background: linear-gradient(135deg, var(--surface), var(--bg));
+            border-bottom: 1px solid rgba(56, 189, 248, 0.2);
+        }
+        h1 { font-size: 2.5rem; margin-bottom: 0.5rem; color: var(--accent); }
+        .subtitle { color: var(--muted); font-size: 1.2rem; }
+        .badges { margin: 1.5rem 0; }
+        .badge {
+            display: inline-block;
+            padding: 0.3rem 0.8rem;
+            margin: 0.2rem;
+            background: var(--surface);
+            border-radius: 20px;
+            font-size: 0.9rem;
+            border: 1px solid rgba(56, 189, 248, 0.3);
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+        .card {
+            background: var(--surface);
+            padding: 1.5rem;
+            border-radius: 12px;
+            border: 1px solid rgba(56, 189, 248, 0.1);
+            transition: transform 0.2s;
+        }
+        .card:hover { transform: translateY(-5px); }
+        .card h2 { color: var(--accent); margin-bottom: 1rem; }
+        .btn {
+            display: inline-block;
+            padding: 0.8rem 1.5rem;
+            background: var(--accent);
+            color: var(--bg);
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: bold;
+            margin-top: 1rem;
+            transition: opacity 0.2s;
+        }
+        .btn:hover { opacity: 0.9; }
+        code {
+            background: var(--bg);
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+        }
+        pre {
+            background: var(--bg);
+            padding: 1rem;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 1rem 0;
+        }
+        footer {
+            text-align: center;
+            padding: 2rem;
+            margin-top: 3rem;
+            color: var(--muted);
+            border-top: 1px solid rgba(56, 189, 248, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>🤖 AI Chatbot Pro</h1>
+            <p class="subtitle">Next-Gen Roblox AI Chatbot with Cinematic UI</p>
+            <div class="badges">
+                <span class="badge">v5.1</span>
+                <span class="badge">MacLib UI</span>
+                <span class="badge">Multi-Provider</span>
+                <span class="badge">Free & Open Source</span>
+            </div>
+            <a href="https://github.com/Mikeykorby/ai-chatbot-pro" class="btn">View on GitHub</a>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="grid">
+            <div class="card">
+                <h2>📥 Installation</h2>
+                <p>Get started in minutes:</p>
+                <pre><code>1. Download the latest release
+2. Insert into Roblox Studio
+3. Configure your API keys
+4. Enjoy!</code></pre>
+                <a href="https://github.com/Mikeykorby/ai-chatbot-pro/releases" class="btn">Download</a>
+            </div>
+
+            <div class="card">
+                <h2>⚙️ Features</h2>
+                <ul style="list-style: none; padding-left: 0;">
+                    <li>✓ Cinematic Animations</li>
+                    <li>✓ Tab Navigation</li>
+                    <li>✓ Memory Management</li>
+                    <li>✓ Multi-Provider Support</li>
+                    <li>✓ MacLib UI Integration</li>
+                    <li>✓ Real-time Status</li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h2>🔧 Configuration</h2>
+                <p>Supports multiple AI providers:</p>
+                <ul>
+                    <li>Ollama (Local)</li>
+                    <li>Google Gemini</li>
+                    <li>Groq</li>
+                    <li>Hugging Face</li>
+                </ul>
+                <a href="https://github.com/Mikeykorby/ai-chatbot-pro#configuration" class="btn">Learn More</a>
+            </div>
+
+            <div class="card">
+                <h2>📚 Documentation</h2>
+                <p>Complete guides and examples:</p>
+                <ul>
+                    <li>Setup Guide</li>
+                    <li>API Configuration</li>
+                    <li>Troubleshooting</li>
+                    <li>FAQ</li>
+                </ul>
+                <a href="https://github.com/Mikeykorby/ai-chatbot-pro#readme" class="btn">Read Docs</a>
+            </div>
+        </div>
+
+        <div class="card" style="margin-top: 2rem;">
+            <h2>🚀 Quick Start</h2>
+            <p>Paste this into a LocalScript in Roblox Studio:</p>
+            <pre><code>-- AI Chatbot Pro v5.1
+-- Get the full script from GitHub
+local script = game:GetService("ReplicatedStorage"):WaitForChild("AIChatbotPro")</code></pre>
+            <p style="margin-top: 1rem; color: var(--muted);">
+                For detailed instructions, visit our <a href="https://github.com/Mikeykorby/ai-chatbot-pro" style="color: var(--accent);">GitHub repository</a>.
+            </p>
+        </div>
+    </div>
+
+    <footer>
+        <p>Made with ❤️ by seem2006</p>
+        <p>© 2024 AI Chatbot Pro. MIT License.</p>
+        <p>
+            <a href="https://github.com/Mikeykorby/ai-chatbot-pro" style="color: var(--accent);">GitHub</a> •
+            <a href="https://github.com/Mikeykorby/ai-chatbot-pro/issues" style="color: var(--accent);">Issues</a> •
+            <a href="https://github.com/Mikeykorby/ai-chatbot-pro/discussions" style="color: var(--accent);">Discussions</a>
+        </p>
+    </footer>
+</body>
+</html>

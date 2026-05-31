@@ -1,12 +1,12 @@
-# 🥞 Animated Pancake - AI Chatbot Pro v5.1
+# 🤖 AI Chatbot Pro v5.1
 
 > **Next-Gen Roblox AI Chatbot with Cinematic UI & Multi-Provider Support**
 
-[![Version](https://img.shields.io/github/v/release/Mikeykorby/animated-pancake?label=Latest%20Release&color=blue)](https://github.com/Mikeykorby/animated-pancake/releases)
-[![License](https://img.shields.io/github/license/Mikeykorby/animated-pancake?color=green)](LICENSE)
-[![Stars](https://img.shields.io/github/stars/Mikeykorby/animated-pancake?style=social)](https://github.com/Mikeykorby/animated-pancake/stargazers)
-[![Forks](https://img.shields.io/github/forks/Mikeykorby/animated-pancake?style=social)](https://github.com/Mikeykorby/animated-pancake/network/members)
-[![Last Updated](https://img.shields.io/github/last-commit/Mikeykorby/animated-pancake?color=orange)](https://github.com/Mikeykorby/animated-pancake/commits/main)
+[![Version](https://img.shields.io/github/v/release/Mikeykorby/ai-chatbot-pro?label=Latest%20Release&color=blue)](https://github.com/Mikeykorby/ai-chatbot-pro/releases)
+[![License](https://img.shields.io/github/license/Mikeykorby/ai-chatbot-pro?color=green)](LICENSE)
+[![Stars](https://img.shields.io/github/stars/Mikeykorby/ai-chatbot-pro?style=social)](https://github.com/Mikeykorby/ai-chatbot-pro/stargazers)
+[![Forks](https://img.shields.io/github/forks/Mikeykorby/ai-chatbot-pro?style=social)](https://github.com/Mikeykorby/ai-chatbot-pro/network/members)
+[![Last Updated](https://img.shields.io/github/last-commit/Mikeykorby/ai-chatbot-pro?color=orange)](https://github.com/Mikeykorby/ai-chatbot-pro/commits/main)
 
 ---
 
@@ -56,14 +56,14 @@ Perfect for enhancing player engagement with automated, context-aware responses!
 ## 📦 Installation
 
 ### Option 1: Direct Download
-1. Go to [Releases](https://github.com/Mikeykorby/animated-pancake/releases)
+1. Go to [Releases](https://github.com/Mikeykorby/ai-chatbot-pro/releases)
 2. Download the latest `.lua` file
 3. Paste into your Roblox game's `ServerScriptService` or `StarterPlayerScripts`
 
 ### Option 2: Clone Repository
 ```bash
-git clone https://github.com/Mikeykorby/animated-pancake.git
-cd animated-pancake
+git clone https://github.com/Mikeykorby/ai-chatbot-pro.git
+cd ai-chatbot-pro
 ```
 
 ### Option 3: Roblox Studio
@@ -119,7 +119,7 @@ local CFG = {
 ### Current Release: v5.1
 - **Date**: May 2024
 - **Status**: ✅ Stable
-- **Download**: [Latest Release](https://github.com/Mikeykorby/animated-pancake/releases/latest)
+- **Download**: [Latest Release](https://github.com/Mikeykorby/ai-chatbot-pro/releases/latest)
 
 ### Version History
 
@@ -130,7 +130,7 @@ local CFG = {
 | v4.0    | Apr 2024   | ⚠️ Deprecated | Single window design              |
 | v3.0    | Mar 2024   | ❌ Legacy | Basic chatbot functionality         |
 
-[View All Releases →](https://github.com/Mikeykorby/animated-pancake/releases)
+[View All Releases →](https://github.com/Mikeykorby/ai-chatbot-pro/releases)
 
 ---
 
@@ -159,8 +159,8 @@ local CFG = {
 ## 🆘 Support
 
 ### Getting Help
-1. Check the [Issues](https://github.com/Mikeykorby/animated-pancake/issues) page
-2. Start a [Discussion](https://github.com/Mikeykorby/animated-pancake/discussions)
+1. Check the [Issues](https://github.com/Mikeykorby/ai-chatbot-pro/issues) page
+2. Start a [Discussion](https://github.com/Mikeykorby/ai-chatbot-pro/discussions)
 3. Join our Discord (link in About Me)
 
 ### Bug Report Template
@@ -231,10 +231,10 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 
 ## 📊 Stats
 
-![GitHub Stars](https://img.shields.io/github/stars/Mikeykorby/animated-pancake?style=social)
-![GitHub Forks](https://img.shields.io/github/forks/Mikeykorby/animated-pancake?style=social)
-![GitHub Issues](https://img.shields.io/github/issues/Mikeykorby/animated-pancake)
-![GitHub Pull Requests](https://img.shields.io/github/issues-pr/Mikeykorby/animated-pancake)
+![GitHub Stars](https://img.shields.io/github/stars/Mikeykorby/ai-chatbot-pro?style=social)
+![GitHub Forks](https://img.shields.io/github/forks/Mikeykorby/ai-chatbot-pro?style=social)
+![GitHub Issues](https://img.shields.io/github/issues/Mikeykorby/ai-chatbot-pro)
+![GitHub Pull Requests](https://img.shields.io/github/issues-pr/Mikeykorby/ai-chatbot-pro)
 
 ---
 
@@ -242,6 +242,6 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 
 **Made with ❤️ by seem2006**
 
-[⬆ Back to Top](#-animated-pancake---ai-chatbot-pro-v51)
+[⬆ Back to Top](#-ai-chatbot-pro---ai-chatbot-pro-v51)
 
 </div>
