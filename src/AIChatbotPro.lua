@@ -1,52 +1,57 @@
--- Roblox Chatbot Script with Ollama (LLaMA 3.1) and Velocity Executor
--- Enhanced UI, supports both old 2017 chat and new TextChatService, memory for 30 messages, reopen button, smooth dragging, and dynamic prefix based on name format
+-- ╔══════════════════════════════════════════════════════════════════════════════╗
+-- ║                         AI CHATBOT PRO  v5.1                                 ║
+-- ║              Single Window · Tab Navigation · Cinematic Animations           ║
+-- ║                    Now with Real MacLib Integration!                         ║
+-- ╚══════════════════════════════════════════════════════════════════════════════╝
 
--- MEMORY SETUP --
-local memory = {}
-local MAX_MEMORY = 30 -- Limit memory to 30 messages
-
--- Add the memory of the current conversation
-local function addToMemory(message, response)
-    if #memory >= MAX_MEMORY then
-        table.remove(memory, 1) -- Remove the oldest entry if at limit
-    end
-    table.insert(memory, {message = message, response = response})
-    warn("Memory updated. Current memory size: " .. #memory)
+-- Load MacLib from biggaboy212/Maclib
+local Maclib = loadstring(game:HttpGet("https://raw.githubusercontent.com/biggaboy212/Maclib/main/loader.lua"))()
+if not Maclib then
+    warn("[AI Chatbot Pro] Failed to load MacLib! Falling back to custom UI...")
 end
 
--- Reset memory function
-local function resetMemory()
-    memory = {}
-    warn("Memory has been reset!")
-end
-
-local AI_ACTIVE = true  -- Flag to turn AI on and off
-local CLOSE_RANGE_ONLY = true
-
-_G.MESSAGE_SETTINGS = {
-    ["MINIMUM_CHARACTERS"] = 1,
-    ["MAXIMUM_CHARACTERS"] = 200,
-    ["MAXIMUM_STUDS"] = 11,
-}
-
-_G.WHITELISTED = { -- Only works if CLOSE_RANGE_ONLY is disabled
-    ["seem2006"] = true,
-}
-
-_G.BLACKLISTED = { -- Only works if CLOSE_RANGE_ONLY is enabled
-    ["Builderman"] = true,
-}
-
-_G.PLAYER_NAME_FORMAT = "P" -- Default player name format (just 'P')
-_G.NAME_SEPARATOR = ","  -- Default separator (can be comma or colon)
-
--- GUI SETUP --
+-- ═══════ SERVICES ═══════
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local HttpService = game:GetService("HttpService")
+local TextChatService = game:GetService("TextChatService")
 local UserInputService = game:GetService("UserInputService")
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "PersistentScreenGui"
-screenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
-screenGui.ResetOnSpawn = false
-screenGui.IgnoreGuiInset = true
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+-- ═══════ CONFIG ═══════
+local CFG = {
+    GEMINI_API_KEY = "YOUR_GEMINI_API_KEY_HERE",
+    GEMINI_MODEL = "gemini-2.0-flash",
+    GROQ_API_KEY = "YOUR_GROQ_API_KEY_HERE",
+    GROQ_MODEL = "llama-3.1-8b-instant",
+    HF_USE_LOCAL = false,
+    HF_LOCAL_URL = "http://localhost:5000",
+    AI_PROVIDER = 0, -- 0=Ollama, 1=Gemini, 2=Groq, 3=HF Local
+    MAX_MEMORY = 30,
+    AI_ACTIVE = true,
+    CLOSE_RANGE_ONLY = true,
+    MIN_CHARS = 1,
+    MAX_CHARS = 200,
+    MAX_STUDS = 11,
+    NAME_FORMAT = "P",
+    NAME_SEPARATOR = ",",
+    SHOW_PREFIX = true,
+}
+
+local WHITELIST = { seem2006 = true }
+local BLACKLIST = { Builderman = true }
+
+-- ═══════ STATE ═══════
+local Memory = {}
+local Debounce = false
+local UI = {}
+local Connections = {}
+local CurrentTab = "main"
+local MacLibWindow = nil
 
 -- Main Frame
 local frame = Instance.new("Frame")
